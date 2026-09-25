@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Marca Huasca Retreats: el logo es verde bosque muy oscuro (no azul) +
+     dorado/mostaza, con acentos "Warm Forest" (olivo/naranja) */
+  --navy: #1f2a20;
+  --navy-deep: #141c15;
+  --gold: #c9a24a;
+  --gold-light: #e4c777;
+  --olive-deep: #333c26;
+  --burnt-orange: #c1622d;
+  --cream: #f3ede0;
+  --stone: #6b6459;
+
+  --background: var(--cream);
+  --foreground: var(--navy-deep);
 }
 
 @theme inline {
+  --color-navy: var(--navy);
+  --color-navy-deep: var(--navy-deep);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-olive-deep: var(--olive-deep);
+  --color-burnt-orange: var(--burnt-orange);
+  --color-cream: var(--cream);
+  --color-stone: var(--stone);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+}
+
+/* Tipografía del sitio público (huéspedes): serif editorial bold (Fraunces)
+   para titulares, sans geométrica bold (Plus Jakarta Sans) para el resto —
+   más contemporáneo que las fuentes de sistema que se usaban antes. El
+   panel de administración no usa estas clases, así que no lo toca. */
+.font-display {
+  font-family: var(--font-display), Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'URW Palladio L', serif;
+  font-weight: 700;
+}
+.font-body {
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, ui-sans-serif, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
