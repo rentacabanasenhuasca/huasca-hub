@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - cd /home4/huascare/repositories/huasca-hub && npm install && npm run build
