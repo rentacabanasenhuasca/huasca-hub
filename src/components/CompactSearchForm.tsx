@@ -27,7 +27,7 @@ export default function CompactSearchForm({
   return (
     <form
       method="get"
-      action="/"
+      action="/#resultados"
       className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-2 w-full sm:w-auto"
     >
       <label className="flex-1 sm:flex-none sm:w-36">

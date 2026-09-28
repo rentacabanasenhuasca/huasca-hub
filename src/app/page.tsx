@@ -252,7 +252,7 @@ export default async function Home({
         </div>
       </section>
 
-      <main className="max-w-5xl mx-auto px-4 pt-16 sm:pt-20">
+      <main id="resultados" className="max-w-5xl mx-auto px-4 pt-16 sm:pt-20 scroll-mt-28">
         <div className="pb-8">
           {!properties || properties.length === 0 ? (
             <p className="text-stone text-sm">Todavía no hay cabañas publicadas.</p>
