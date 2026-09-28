@@ -30,6 +30,14 @@ function getTransporter() {
       // es STARTTLS (secure: false, pero sigue siendo cifrado).
       secure: Number(port) === 465,
       auth: { user, pass },
+      // Si el puerto de correo saliente está bloqueado por el proveedor del
+      // servidor (común en VPS nuevos, hasta desbloquearlo), sin esto la
+      // conexión se queda colgada 1-2 minutos antes de fallar — con esto
+      // falla en 8s y la reserva/pago no se siente lento por un correo que
+      // de todos modos es "mejor esfuerzo" (ver booking-finalize.ts).
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 8000,
     })
   }
   return transporter
