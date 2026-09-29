@@ -62,7 +62,8 @@ export default async function EditarPropiedadPage({
   // devolver { error } cuando falla, y el action de un <form> debe regresar
   // void | Promise<void> — este wrapper descarta ese valor para cumplir el
   // tipo (el error, si ocurre, simplemente no se refleja en la UI por ahora).
-  const boundDuplicate = async () => {
+  async function boundDuplicate() {
+    'use server'
     await duplicateProperty(id)
   }
 
