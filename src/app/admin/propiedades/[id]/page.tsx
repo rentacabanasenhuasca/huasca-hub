@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { requireHost } from '@/lib/hosts'
 import PropertyForm, { type BedRecord } from '../PropertyForm'
-import { updateProperty, deleteProperty } from '../actions'
+import { updateProperty, deleteProperty, duplicateProperty } from '../actions'
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton'
 import IcalSources from './IcalSources'
 import EmailTemplates from './EmailTemplates'
@@ -58,6 +58,7 @@ export default async function EditarPropiedadPage({
 
   const boundUpdate = updateProperty.bind(null, id)
   const boundDelete = deleteProperty.bind(null, id)
+  const boundDuplicate = duplicateProperty.bind(null, id)
 
   const hdrs = await headers()
   const requestHost = hdrs.get('host') ?? 'localhost:3000'
@@ -68,7 +69,13 @@ export default async function EditarPropiedadPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-navy-deep">{property.name}</h1>
-        <form action={boundDelete}>
+        <div className="flex items-center gap-4">
+          <form action={boundDuplicate}>
+            <button type="submit" className="text-sm text-gold hover:underline">
+              Duplicar propiedad
+            </button>
+          </form>
+          <form action={boundDelete}>
           <ConfirmSubmitButton
             confirmMessage={`¿Seguro que quieres eliminar "${property.name}"? Esto borra también sus fotos, amenidades y reglas de precio aplicadas. No se puede deshacer.`}
             className="text-sm text-burnt-orange hover:underline"
@@ -76,6 +83,7 @@ export default async function EditarPropiedadPage({
             Eliminar propiedad
           </ConfirmSubmitButton>
         </form>
+        </div>
       </div>
       <PropertyForm
         action={boundUpdate}
