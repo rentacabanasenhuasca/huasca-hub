@@ -43,6 +43,7 @@ type BlockedDate = {
   property_id: string
   date: string
   source: string
+  note: string | null
   booking_id: string | null
   external_summary: string | null
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
@@ -179,6 +180,7 @@ export default function CalendarGrid({
   const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [minNightsInput, setMinNightsInput] = useState('')
+  const [blockNoteInput, setBlockNoteInput] = useState('')
 
   const [showManualBooking, setShowManualBooking] = useState(false)
 
@@ -312,6 +314,7 @@ export default function CalendarGrid({
           property_id: res.newPropertyId!,
           date,
           source: 'booking',
+          note: null,
           booking_id: bookingId,
           external_summary: null,
           ical_sources: null,
@@ -518,8 +521,9 @@ export default function CalendarGrid({
     if (selected.size === 0) return
     setError(null)
     const selections = selectionToSelections()
+    const noteToSave = blocked ? blockNoteInput.trim() || null : undefined
     startTransition(async () => {
-      const res = await setManualBlock(selections, blocked)
+      const res = await setManualBlock(selections, blocked, noteToSave)
       if (res?.error) {
         setError(res.error)
         return
@@ -529,6 +533,7 @@ export default function CalendarGrid({
         ...prev.filter((b) => !keySet.has(key(b.property_id, b.date))),
         ...(res.blocked ?? []),
       ])
+      if (blocked) setBlockNoteInput('')
       // "Abrir fechas" solo quita bloqueos manuales — si alguna celda
       // seleccionada sigue bloqueada por una reserva real o por otro
       // calendario (iCal), no se libera aquí (para no des-sincronizar
@@ -891,7 +896,7 @@ export default function CalendarGrid({
                       : kind === 'direct'
                         ? 'Bloqueado — reserva directa en este sitio'
                         : kind === 'manual'
-                          ? 'Bloqueado manualmente'
+                          ? `Bloqueado manualmente${blocked.note ? ` — ${blocked.note}` : ''}`
                           : `Bloqueado — ${icalSource?.label ?? 'calendario externo'}${blocked.external_summary ? ` (${blocked.external_summary})` : ''}`
                   return (
                     <td
@@ -983,6 +988,17 @@ export default function CalendarGrid({
           >
             Bloquear fechas
           </button>
+          <label className="flex items-center gap-2">
+            <span className="text-xs text-stone">Nota (opcional):</span>
+            <input
+              type="text"
+              placeholder="Ej. Mantenimiento, uso personal…"
+              value={blockNoteInput}
+              onChange={(e) => setBlockNoteInput(e.target.value)}
+              disabled={selected.size === 0}
+              className="w-56 rounded-lg border border-stone/30 bg-white px-3 py-1.5 text-sm text-navy-deep disabled:opacity-50"
+            />
+          </label>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-stone/10">
@@ -1199,7 +1215,15 @@ export default function CalendarGrid({
                   </p>
                 </div>
               ) : kind === 'manual' ? (
-                <p className="text-sm text-stone">Bloqueaste esta fecha manualmente desde el calendario.</p>
+                <div className="text-sm space-y-2">
+                  <p className="text-stone">Bloqueaste esta fecha manualmente desde el calendario.</p>
+                  {blocked?.note && (
+                    <div>
+                      <dt className="text-xs text-stone">Nota</dt>
+                      <dd className="text-navy-deep">{blocked.note}</dd>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="text-sm text-stone">Bloqueado por un calendario externo sincronizado.</p>
               )}
