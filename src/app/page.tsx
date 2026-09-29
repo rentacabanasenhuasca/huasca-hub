@@ -196,6 +196,16 @@ export default async function Home({
     })
     .filter((r) => r.fitsGuests && r.minNightsOk && r.isFree)
 
+    // Barajamos el orden en el que se muestran las tarjetas: sin esto, como la
+    // consulta viene ordenada por nombre, propiedades con nombres parecidos
+    // (p.ej. las dos "Glasshouse") siempre salían juntas. Fisher-Yates in situ;
+    // se recalcula en cada carga de la página (es un Server Component), así
+    // que el orden cambia entre visitas pero es el mismo durante una misma carga.
+    for (let i = results.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[results[i], results[j]] = [results[j], results[i]]
+    }
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LodgingBusiness',
