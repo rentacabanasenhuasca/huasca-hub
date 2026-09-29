@@ -58,7 +58,13 @@ export default async function EditarPropiedadPage({
 
   const boundUpdate = updateProperty.bind(null, id)
   const boundDelete = deleteProperty.bind(null, id)
-  const boundDuplicate = duplicateProperty.bind(null, id)
+  // No usamos .bind aquí como con boundDelete: duplicateProperty puede
+  // devolver { error } cuando falla, y el action de un <form> debe regresar
+  // void | Promise<void> — este wrapper descarta ese valor para cumplir el
+  // tipo (el error, si ocurre, simplemente no se refleja en la UI por ahora).
+  const boundDuplicate = async () => {
+    await duplicateProperty(id)
+  }
 
   const hdrs = await headers()
   const requestHost = hdrs.get('host') ?? 'localhost:3000'
