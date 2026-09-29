@@ -40,6 +40,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/configuracion" className="hover:text-gold-light transition">
               Configuración
             </Link>
+            <a
+              href="/?preview=huasca2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-gold-light px-3 py-1 text-gold-light hover:bg-gold-light hover:text-navy-deep transition"
+            >
+              Ver sitio
+            </a>
             <form action={signOut}>
               <button className="text-stone hover:text-burnt-orange transition">
                 Salir
