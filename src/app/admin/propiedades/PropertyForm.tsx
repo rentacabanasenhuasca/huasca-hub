@@ -43,12 +43,12 @@ export type PhotoRecord = { url: string; category: string | null; description: s
 // arreglo, que cambia mientras las fotos siguen subiendo.
 type PhotoRow = PhotoRecord & { _key: string }
 
-export type BedRecord = { room_type: 'recamara' | 'altillo_tapanco'; bed_type: string; quantity: number }
+export type BedRecord = { room_type: 'recamara' | 'altillo_tapanco' | 'otro'; bed_type: string; quantity: number }
 type BedRow = BedRecord & { _key: string }
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
   recamara: 'Recámara',
-  altillo_tapanco: 'Altillo / Tapanco',
+  altillo_tapanco: 'Altillo / Tapanco', otro: 'Otro espacio',
 }
 
 const BED_TYPE_LABELS: Record<string, string> = {
@@ -57,7 +57,7 @@ const BED_TYPE_LABELS: Record<string, string> = {
   queen: 'Queen',
   king: 'King',
   litera: 'Litera',
-  cuna: 'Cuna',
+  cuna: 'Cuna', sofa_cama: 'Sofá cama',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
