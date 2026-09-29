@@ -124,6 +124,33 @@ async function syncPhotos(
   }
 }
 
+async function syncBeds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  propertyId: string,
+  formData: FormData
+) {
+  const roomTypes = formData.getAll('bed_room_type').map(String)
+  const bedTypes = formData.getAll('bed_type').map(String)
+  const quantities = formData.getAll('bed_quantity').map(String)
+
+  await supabase.from('property_beds').delete().eq('property_id', propertyId)
+
+  const rows = bedTypes
+    .map((bedType, i) => ({
+      property_id: propertyId,
+      room_type: roomTypes[i] === 'altillo_tapanco' ? 'altillo_tapanco' : 'recamara',
+      bed_type: bedType,
+      quantity: Math.max(1, Number(quantities[i]) || 1),
+      sort_order: i,
+    }))
+    .filter((r) => r.bed_type)
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from('property_beds').insert(rows)
+    if (error) throw new Error(`No se pudieron guardar las camas: ${error.message}`)
+  }
+}
+
 export async function createProperty(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const host = await requireHost()
   const supabase = await createClient()
@@ -149,6 +176,7 @@ export async function createProperty(_prev: ActionState, formData: FormData): Pr
   try {
     await syncAmenities(supabase, property.id, formData)
     await syncPhotos(supabase, property.id, formData)
+    await syncBeds(supabase, property.id, formData)
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Error guardando detalles.' }
   }
@@ -181,6 +209,7 @@ export async function updateProperty(
   try {
     await syncAmenities(supabase, propertyId, formData)
     await syncPhotos(supabase, propertyId, formData)
+    await syncBeds(supabase, propertyId, formData)
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Error guardando detalles.' }
   }
