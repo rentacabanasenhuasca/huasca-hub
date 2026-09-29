@@ -118,6 +118,20 @@ export async function sendBookingEmails(supabase: SupabaseClient, bookingId: str
   if (!property) return { sent: 0, errors: ['La reserva no tiene propiedad asociada.'] }
   const host = Array.isArray(property.hosts) ? property.hosts[0] : property.hosts
 
+  const { data: bookingAddons } = await supabase
+    .from('booking_addons')
+    .select('name, unit_price_mxn, quantity, subtotal_mxn')
+    .eq('booking_id', bookingId)
+
+  const addonsText = (bookingAddons ?? []).length
+    ? (bookingAddons ?? [])
+        .map(
+          (a) =>
+            `- ${a.name}${a.quantity > 1 ? ` x${a.quantity}` : ''}: $${Number(a.subtotal_mxn).toLocaleString('es-MX')} MXN`
+        )
+        .join('\n')
+    : 'Ninguno'
+
   const nights = Math.round(
     (new Date(`${booking.check_out}T00:00:00Z`).getTime() - new Date(`${booking.check_in}T00:00:00Z`).getTime()) /
       86400000
@@ -149,6 +163,7 @@ export async function sendBookingEmails(supabase: SupabaseClient, bookingId: str
     host_name: host?.name ?? '',
     host_email: host?.email ?? '',
     host_phone: host?.phone ?? '',
+    addons: addonsText,
   }
 
   const { data: templates } = await supabase

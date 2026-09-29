@@ -26,4 +26,5 @@ export const EMAIL_PLACEHOLDERS: { key: string; label: string }[] = [
   { key: 'host_name', label: 'Tu nombre (anfitrión)' },
   { key: 'host_email', label: 'Tu correo' },
   { key: 'host_phone', label: 'Tu teléfono' },
+  { key: 'addons', label: 'Extras contratados por el huésped' },
 ]
