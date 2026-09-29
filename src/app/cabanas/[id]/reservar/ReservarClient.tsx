@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { GuestCounts } from '@/lib/occupancy'
 import type { GuestInfo } from './booking-finalize'
-import { createStripePaymentIntent, finalizeStripeBooking, createMercadoPagoPayment } from './checkout-actions'
+import { createStripePaymentIntent, finalizeStripeBooking, createMercadoPagoPayment, validateDiscountCodeAction } from './checkout-actions'
 import StripePaymentForm from './StripePaymentForm'
 import MercadoPagoPaymentForm from './MercadoPagoPaymentForm'
 
@@ -53,6 +53,34 @@ export default function ReservarClient({
   // se vuelve a calcular en el servidor a partir del catálogo real.
   const [addonQuantities, setAddonQuantities] = useState<Record<string, number>>({})
 
+  // Cupón de descuento: el huésped escribe un código y lo valida antes de
+  // pagar (solo para mostrar el total con descuento) — el monto real
+  // siempre se vuelve a calcular en el servidor al cobrar y al confirmar.
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number; description: string | null } | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [checkingCoupon, setCheckingCoupon] = useState(false)
+
+  async function applyCoupon() {
+    if (!couponInput.trim()) return
+    setCheckingCoupon(true)
+    setCouponError(null)
+    const result = await validateDiscountCodeAction(propertyId, checkin, checkout, guests, couponInput)
+    setCheckingCoupon(false)
+    if ('error' in result) {
+      setCouponError(result.error ?? 'Ese código no es válido.')
+      setAppliedCoupon(null)
+      return
+    }
+    setAppliedCoupon({ code: result.code!, amount: result.discountAmount!, description: result.description ?? null })
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null)
+    setCouponInput('')
+    setCouponError(null)
+  }
+
   const addonSelections = useMemo(
     () =>
       Object.entries(addonQuantities)
@@ -70,7 +98,7 @@ export default function ReservarClient({
     [addons, addonQuantities]
   )
 
-  const total = baseTotal + addonsTotal
+  const total = Math.max(0, baseTotal + addonsTotal - (appliedCoupon?.amount ?? 0))
 
   function setAddonQty(addon: AddonOption, qty: number) {
     setAddonQuantities((prev) => ({
@@ -93,7 +121,7 @@ export default function ReservarClient({
     setProvider(next)
     if (next === 'stripe' && !clientSecret) {
       setLoadingProvider('stripe')
-      const result = await createStripePaymentIntent({ propertyId, checkin, checkout, guests, guestInfo, addonSelections })
+      const result = await createStripePaymentIntent({ propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code })
       setLoadingProvider(null)
       if ('error' in result) {
         setError(result.error ?? 'Ocurrió un error inesperado.')
@@ -107,7 +135,7 @@ export default function ReservarClient({
   async function handleStripeConfirmed(paymentIntentId: string) {
     setFinalizing(true)
     setError(null)
-    const result = await finalizeStripeBooking(paymentIntentId, { propertyId, checkin, checkout, guests, guestInfo, addonSelections })
+    const result = await finalizeStripeBooking(paymentIntentId, { propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code })
     if ('error' in result) {
       setFinalizing(false)
       setError(result.error ?? 'Ocurrió un error inesperado.')
@@ -133,6 +161,7 @@ export default function ReservarClient({
       guests,
       guestInfo,
       addonSelections,
+      discountCode: appliedCoupon?.code,
       token: data.token,
       paymentMethodId: data.payment_method_id,
       issuerId: data.issuer_id,
@@ -211,6 +240,44 @@ export default function ReservarClient({
               )
             })}
           </div>
+        </div>
+      )}
+
+      {!confirmed && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-navy-deep">¿Tienes un código de descuento?</p>
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between rounded-xl border border-gold/40 bg-gold/10 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium text-navy-deep">
+                  {appliedCoupon.code} aplicado — -${Math.round(appliedCoupon.amount).toLocaleString('es-MX')} MXN
+                </p>
+                {appliedCoupon.description && <p className="text-xs text-stone">{appliedCoupon.description}</p>}
+              </div>
+              <button type="button" onClick={removeCoupon} className="text-xs text-stone hover:text-burnt-orange transition shrink-0 ml-2">
+                Quitar
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Código de descuento"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                className="flex-1 rounded-xl border border-stone/25 px-3 py-2.5 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
+              />
+              <button
+                type="button"
+                onClick={applyCoupon}
+                disabled={checkingCoupon || !couponInput.trim()}
+                className="rounded-xl border border-stone/25 px-4 py-2.5 text-sm font-medium text-navy-deep hover:border-gold transition disabled:opacity-40"
+              >
+                {checkingCoupon ? 'Validando…' : 'Aplicar'}
+              </button>
+            </div>
+          )}
+          {couponError && <p className="text-xs text-burnt-orange">{couponError}</p>}
         </div>
       )}
 

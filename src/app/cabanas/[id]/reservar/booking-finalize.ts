@@ -10,6 +10,7 @@ import type { GuestCounts } from '@/lib/occupancy'
 import { nightsBetween } from '@/lib/calendar'
 import { sendBookingEmails } from '@/lib/booking-emails'
 import type { ResolvedAddonItem } from '@/lib/addons'
+import { resolveDiscountCode, applyDiscountUsage } from '@/lib/discounts'
 
 export type GuestInfo = {
   name: string
@@ -20,6 +21,7 @@ export type GuestInfo = {
 
 export type FinalizeBookingInput = {
   property: QuoteProperty
+  hostId: string
   checkin: string
   checkout: string
   guests: GuestCounts
@@ -28,6 +30,10 @@ export type FinalizeBookingInput = {
   providerFields: Record<string, string | null>
   totalCharged: number
   addonItems?: ResolvedAddonItem[]
+  // Código de descuento escrito por el huésped (crudo, sin validar) — se
+  // vuelve a validar y calcular aquí mismo, nunca se confía en un monto que
+  // haya calculado el cliente o una llamada anterior.
+  discountCode?: string
 }
 
 export type FinalizeBookingResult =
@@ -46,7 +52,7 @@ export async function finalizeBooking(
   supabase: SupabaseClient,
   input: FinalizeBookingInput
 ): Promise<FinalizeBookingResult> {
-  const { property, checkin, checkout, guests, guestInfo, provider, providerFields, totalCharged, addonItems } = input
+  const { property, hostId, checkin, checkout, guests, guestInfo, provider, providerFields, totalCharged, addonItems, discountCode } = input
 
   const quote = await getBookingQuote(supabase, property, checkin, checkout, guests)
 
@@ -66,6 +72,19 @@ export async function finalizeBooking(
 
   const nights = nightsBetween(checkin, checkout)
 
+  let discountCodeId: string | null = null
+  let discountCodeText: string | null = null
+  let discountAmount = 0
+  if (discountCode) {
+    const discountResult = await resolveDiscountCode(supabase, hostId, property.id, checkin, nights.length, quote.total, discountCode)
+    if (!discountResult.valid) {
+      return { ok: false, error: discountResult.error }
+    }
+    discountCodeId = discountResult.discountCodeId
+    discountCodeText = discountResult.code
+    discountAmount = discountResult.discountAmount
+  }
+
   const { data: booking, error: bookingError } = await supabase
     .from('bookings')
     .insert({
@@ -84,6 +103,9 @@ export async function finalizeBooking(
       total_price_mxn: totalCharged,
       payment_provider: provider,
       guest_notes: guestInfo.notes || null,
+      discount_code_id: discountCodeId,
+      discount_code: discountCodeText,
+      discount_amount_mxn: discountAmount,
       ...providerFields,
     })
     .select('id')
@@ -144,6 +166,16 @@ export async function finalizeBooking(
       }))
     )
     if (addonsError) console.warn('[booking-addons]', addonsError.message)
+  }
+
+  // Igual que los correos de abajo: mejor esfuerzo. La reserva ya está
+  // confirmada y el cobro ya se hizo, no se revierte nada por esto.
+  if (discountCodeId) {
+    try {
+      await applyDiscountUsage(supabase, discountCodeId)
+    } catch (err) {
+      console.warn('[discount-usage] fallo inesperado:', (err as Error).message)
+    }
   }
 
   revalidatePath('/admin/calendario')

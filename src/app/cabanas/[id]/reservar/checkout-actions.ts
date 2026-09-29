@@ -11,6 +11,7 @@ import {
 import { getBookingQuote, type QuoteProperty } from '@/lib/booking-quote'
 import type { GuestCounts } from '@/lib/occupancy'
 import { resolveAddons, type AddonSelection } from '@/lib/addons'
+import { resolveDiscountCode } from '@/lib/discounts'
 import { finalizeBooking, type GuestInfo } from './booking-finalize'
 
 type PropertyWithHost = QuoteProperty & { host_id: string }
@@ -39,6 +40,34 @@ type CheckoutParams = {
   // precio: el precio real siempre se vuelve a leer de la base de datos
   // (ver resolveAddons en @/lib/addons).
   addonSelections?: AddonSelection[]
+  // Código de descuento escrito por el huésped — el monto real siempre se
+  // vuelve a calcular en el servidor (ver resolveDiscountCode).
+  discountCode?: string
+}
+
+// Valida un código de descuento y devuelve cuánto se descontaría, para que
+// el checkout pueda mostrarlo ANTES de pagar. El cobro real vuelve a
+// validar todo esto de cero (aquí y otra vez al confirmar la reserva) —
+// esta función es solo para la vista previa en la UI.
+export async function validateDiscountCodeAction(
+  propertyId: string,
+  checkin: string,
+  checkout: string,
+  guests: GuestCounts,
+  code: string
+) {
+  const supabase = createServiceClient()
+  const property = await loadProperty(propertyId)
+  const quote = await getBookingQuote(supabase, property, checkin, checkout, guests)
+
+  if (!quote.isFree || !quote.fitsGuests || !quote.minNightsOk) {
+    return { error: 'Estas fechas ya no están disponibles.' }
+  }
+
+  const result = await resolveDiscountCode(supabase, property.host_id, propertyId, checkin, quote.nights.length, quote.total, code)
+  if (!result.valid) return { error: result.error }
+
+  return { discountAmount: result.discountAmount, code: result.code, description: result.description }
 }
 
 // ----------------------------------------------------------------------------
@@ -56,7 +85,23 @@ export async function createStripePaymentIntent(params: CheckoutParams) {
   if (quote.total <= 0) return { error: 'No se pudo calcular el precio de la reserva.' }
 
   const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [])
-  const chargeTotal = quote.total + addons.total
+
+  let discountAmount = 0
+  if (params.discountCode) {
+    const discountResult = await resolveDiscountCode(
+      supabase,
+      property.host_id,
+      params.propertyId,
+      params.checkin,
+      quote.nights.length,
+      quote.total,
+      params.discountCode
+    )
+    if (!discountResult.valid) return { error: discountResult.error }
+    discountAmount = discountResult.discountAmount
+  }
+
+  const chargeTotal = quote.total - discountAmount + addons.total
 
   const stripe = getStripe()
 
@@ -102,6 +147,7 @@ export async function finalizeStripeBooking(paymentIntentId: string, params: Che
 
   const result = await finalizeBooking(supabase, {
     property,
+    hostId: property.host_id,
     checkin: params.checkin,
     checkout: params.checkout,
     guests: params.guests,
@@ -115,6 +161,7 @@ export async function finalizeStripeBooking(paymentIntentId: string, params: Che
     },
     totalCharged: paymentIntent.amount / 100,
     addonItems: addons.items,
+    discountCode: params.discountCode,
   })
 
   if (!result.ok) {
@@ -154,7 +201,23 @@ export async function createMercadoPagoPayment(
   if (quote.total <= 0) return { error: 'No se pudo calcular el precio de la reserva.' }
 
   const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [])
-  const chargeTotal = quote.total + addons.total
+
+  let mpDiscountAmount = 0
+  if (params.discountCode) {
+    const discountResult = await resolveDiscountCode(
+      supabase,
+      property.host_id,
+      params.propertyId,
+      params.checkin,
+      quote.nights.length,
+      quote.total,
+      params.discountCode
+    )
+    if (!discountResult.valid) return { error: discountResult.error }
+    mpDiscountAmount = discountResult.discountAmount
+  }
+
+  const chargeTotal = quote.total - mpDiscountAmount + addons.total
 
   const customerClient = getMercadoPagoCustomerClient()
   const cardClient = getMercadoPagoCustomerCardClient()
@@ -218,6 +281,7 @@ export async function createMercadoPagoPayment(
 
   const result = await finalizeBooking(supabase, {
     property,
+    hostId: property.host_id,
     checkin: params.checkin,
     checkout: params.checkout,
     guests: params.guests,
@@ -230,6 +294,7 @@ export async function createMercadoPagoPayment(
     },
     totalCharged: payment.transaction_amount ?? chargeTotal,
     addonItems: addons.items,
+    discountCode: params.discountCode,
   })
 
   if (!result.ok) {
