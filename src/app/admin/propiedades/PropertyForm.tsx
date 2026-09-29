@@ -43,6 +43,23 @@ export type PhotoRecord = { url: string; category: string | null; description: s
 // arreglo, que cambia mientras las fotos siguen subiendo.
 type PhotoRow = PhotoRecord & { _key: string }
 
+export type BedRecord = { room_type: 'recamara' | 'altillo_tapanco'; bed_type: string; quantity: number }
+type BedRow = BedRecord & { _key: string }
+
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  recamara: 'Recámara',
+  altillo_tapanco: 'Altillo / Tapanco',
+}
+
+const BED_TYPE_LABELS: Record<string, string> = {
+  individual: 'Individual',
+  matrimonial: 'Matrimonial',
+  queen: 'Queen',
+  king: 'King',
+  litera: 'Litera',
+  cuna: 'Cuna',
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   destacado: 'Destacado',
   bano: 'Baño',
@@ -80,6 +97,7 @@ export default function PropertyForm({
   property,
   selectedAmenities = {},
   photos = [],
+  beds = [],
   submitLabel,
 }: {
   action: Action
@@ -87,6 +105,7 @@ export default function PropertyForm({
   property?: PropertyRecord
   selectedAmenities?: Record<string, string | null>
   photos?: PhotoRecord[]
+  beds?: BedRecord[]
   submitLabel: string
 }) {
   const router = useRouter()
@@ -103,6 +122,11 @@ export default function PropertyForm({
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const dragKeyRef = useRef<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [bedRows, setBedRows] = useState<BedRow[]>(
+    beds.length > 0
+      ? beds.map((b) => ({ ...b, _key: uuid() }))
+      : [{ room_type: 'recamara', bed_type: 'matrimonial', quantity: 1, _key: uuid() }]
+  )
 
   async function uploadFile(key: string, file: File) {
     setUploadingKeys((prev) => new Set(prev).add(key))
@@ -240,6 +264,98 @@ export default function PropertyForm({
             step={0.5}
           />
         </div>
+      </Section>
+
+      <Section title="Camas">
+        <p className="text-xs text-stone mb-3">
+          Especifica el tamaño de cada cama y si está en una recámara normal o en un altillo/tapanco,
+          para que el huésped sepa exactamente qué está rentando. El número de &quot;Camas&quot; de
+          arriba es solo el total; esta lista es la que se muestra en la página de la propiedad.
+        </p>
+        <div className="space-y-3">
+          {bedRows.map((row) => (
+            <div key={row._key} className="grid sm:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
+              <input type="hidden" name="bed_room_type" value={row.room_type} readOnly />
+              <input type="hidden" name="bed_type" value={row.bed_type} readOnly />
+              <input type="hidden" name="bed_quantity" value={row.quantity} readOnly />
+              <label>
+                <span className={labelClass}>Espacio</span>
+                <select
+                  value={row.room_type}
+                  onChange={(e) =>
+                    setBedRows((rows) =>
+                      rows.map((r) =>
+                        r._key === row._key
+                          ? { ...r, room_type: e.target.value as BedRecord['room_type'] }
+                          : r
+                      )
+                    )
+                  }
+                  className={inputClass}
+                >
+                  {Object.entries(ROOM_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className={labelClass}>Tipo de cama</span>
+                <select
+                  value={row.bed_type}
+                  onChange={(e) =>
+                    setBedRows((rows) =>
+                      rows.map((r) => (r._key === row._key ? { ...r, bed_type: e.target.value } : r))
+                    )
+                  }
+                  className={inputClass}
+                >
+                  {Object.entries(BED_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className={labelClass}>Cantidad</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={row.quantity}
+                  onChange={(e) =>
+                    setBedRows((rows) =>
+                      rows.map((r) =>
+                        r._key === row._key ? { ...r, quantity: Number(e.target.value) || 1 } : r
+                      )
+                    )
+                  }
+                  className={`${inputClass} w-20`}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setBedRows((rows) => rows.filter((r) => r._key !== row._key))}
+                className="text-xs text-burnt-orange px-2 py-2"
+              >
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setBedRows((rows) => [
+              ...rows,
+              { room_type: 'recamara', bed_type: 'matrimonial', quantity: 1, _key: uuid() },
+            ])
+          }
+          className="text-sm text-gold underline underline-offset-2 mt-3"
+        >
+          + Agregar cama
+        </button>
       </Section>
 
       <Section title="Política de menores">
