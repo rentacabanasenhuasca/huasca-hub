@@ -13,6 +13,7 @@ import type { NextRequest } from 'next/server'
 const ALLOWED_PREFIXES = [
   '/mantenimiento',
   '/admin',
+  '/login',
   '/api',
   '/_next',
   '/favicon.ico',
