@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { requireHost } from '@/lib/hosts'
-import PropertyForm from '../PropertyForm'
+import PropertyForm, { type BedRecord } from '../PropertyForm'
 import { updateProperty, deleteProperty } from '../actions'
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton'
 import IcalSources from './IcalSources'
@@ -26,13 +26,18 @@ export default async function EditarPropiedadPage({
 
   if (!property) notFound()
 
-  const [{ data: amenities }, { data: propertyAmenities }, { data: photos }, { data: icalSources }, { data: emailTemplates }] =
+  const [{ data: amenities }, { data: propertyAmenities }, { data: photos }, { data: beds }, { data: icalSources }, { data: emailTemplates }] =
     await Promise.all([
       supabase.from('amenities').select('id, category, label, sort_order').order('category').order('sort_order'),
       supabase.from('property_amenities').select('amenity_id, description').eq('property_id', id),
       supabase
         .from('property_photos')
         .select('url, category, description')
+        .eq('property_id', id)
+        .order('sort_order'),
+      supabase
+        .from('property_beds')
+        .select('room_type, bed_type, quantity')
         .eq('property_id', id)
         .order('sort_order'),
       supabase
@@ -78,6 +83,7 @@ export default async function EditarPropiedadPage({
         property={property}
         selectedAmenities={selectedAmenities}
         photos={photos ?? []}
+        beds={(beds ?? []) as BedRecord[]}
         submitLabel="Guardar cambios"
       />
 
