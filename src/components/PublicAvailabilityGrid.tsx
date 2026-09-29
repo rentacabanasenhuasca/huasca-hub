@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 // Calendario de disponibilidad de todas las propiedades, para la página de
 // inicio — igual a la tabla verde/naranja (Disponible/Reservado) del sitio
 // anterior de Christian, pero con scroll continuo (rueda del mouse/trackpad)
@@ -142,17 +144,22 @@ export default function PublicAvailabilityGrid({
               <tr key={property.id}>
                 <td className="sticky left-0 bg-white z-10 px-2 py-2 text-navy-deep border-b border-stone/10 font-medium">
                   <div className="flex items-center gap-2 min-w-0">
-                    {property.cover_photo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={property.cover_photo_url}
-                        alt=""
-                        className="h-7 w-7 rounded-md object-cover shrink-0 border border-stone/15"
-                      />
-                    ) : (
-                      <span className="h-7 w-7 rounded-md bg-cream shrink-0 border border-stone/15" />
-                    )}
-                    <span className="truncate">{property.name}</span>
+                    <Link
+                      href={`/cabanas/${property.id}`}
+                      className="flex items-center gap-2 min-w-0 hover:underline"
+                    >
+                      {property.cover_photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={property.cover_photo_url}
+                          alt=""
+                          className="h-7 w-7 rounded-md object-cover shrink-0 border border-stone/15"
+                        />
+                      ) : (
+                        <span className="h-7 w-7 rounded-md bg-cream shrink-0 border border-stone/15" />
+                      )}
+                      <span className="truncate">{property.name}</span>
+                    </Link>
                   </div>
                 </td>
                 {days.map((d) => {
