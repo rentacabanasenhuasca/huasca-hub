@@ -21,6 +21,26 @@ function waLink(phone: string, text: string) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
 }
 
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  recamara: 'Recámara',
+  altillo_tapanco: 'Altillo / Tapanco',
+}
+
+const BED_TYPE_LABELS: Record<string, { singular: string; plural: string }> = {
+  individual: { singular: 'individual', plural: 'individuales' },
+  matrimonial: { singular: 'matrimonial', plural: 'matrimoniales' },
+  queen: { singular: 'queen', plural: 'queen' },
+  king: { singular: 'king', plural: 'king' },
+  litera: { singular: 'litera', plural: 'literas' },
+  cuna: { singular: 'cuna', plural: 'cunas' },
+}
+
+function bedLabel(bedType: string, quantity: number) {
+  const labels = BED_TYPE_LABELS[bedType]
+  const size = quantity === 1 ? (labels?.singular ?? bedType) : (labels?.plural ?? bedType)
+  return `${quantity} cama${quantity === 1 ? '' : 's'} ${size}`
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -106,7 +126,7 @@ export default async function CabanaPage({
   // que eso sea lo que quede indexado y se comparta de aquí en adelante.
   if (property.slug !== id) redirect(`/cabanas/${property.slug}`)
 
-  const [{ data: photos }, { data: propertyAmenities }, { data: host }] = await Promise.all([
+  const [{ data: photos }, { data: propertyAmenities }, { data: propertyBeds }, { data: host }] = await Promise.all([
     supabase
       .from('property_photos')
       .select('url, category, description, sort_order')
@@ -116,8 +136,20 @@ export default async function CabanaPage({
       .from('property_amenities')
       .select('description, amenities(label, category)')
       .eq('property_id', property.id),
+    supabase
+      .from('property_beds')
+      .select('room_type, bed_type, quantity')
+      .eq('property_id', property.id)
+      .order('sort_order', { ascending: true }),
     supabase.from('hosts').select('name, phone, email').eq('id', property.host_id).maybeSingle(),
   ])
+
+  const bedsByRoom = new Map<string, string[]>()
+  for (const b of (propertyBeds ?? []) as { room_type: string; bed_type: string; quantity: number }[]) {
+    const list = bedsByRoom.get(b.room_type) ?? []
+    list.push(bedLabel(b.bed_type, b.quantity))
+    bedsByRoom.set(b.room_type, list)
+  }
 
   const guests = parseGuestsFromParams(sp)
   if (!sp.adults && !sp.guests) guests.adults = property.base_occupancy || guests.adults
@@ -212,6 +244,16 @@ export default async function CabanaPage({
               Hasta {property.capacity} huéspedes · {property.bedrooms} recámaras · {property.beds} camas ·{' '}
               {property.bathrooms} baños{property.pet_friendly ? ' · Pet friendly' : ''}
             </p>
+
+            {bedsByRoom.size > 0 && (
+              <div className="mt-2 text-sm text-stone space-y-0.5">
+                {[...bedsByRoom.entries()].map(([roomType, list]) => (
+                  <p key={roomType}>
+                    {ROOM_TYPE_LABELS[roomType] ?? roomType}: {list.join(', ')}
+                  </p>
+                ))}
+              </div>
+            )}
 
             {property.description && (
               <p className="text-[15px] text-navy-deep mt-6 whitespace-pre-line leading-relaxed">
