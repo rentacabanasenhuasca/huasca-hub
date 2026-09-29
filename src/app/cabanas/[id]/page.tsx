@@ -23,7 +23,7 @@ function waLink(phone: string, text: string) {
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
   recamara: 'Recámara',
-  altillo_tapanco: 'Altillo / Tapanco',
+  altillo_tapanco: 'Altillo / Tapanco', otro: 'Otro espacio',
 }
 
 const BED_TYPE_LABELS: Record<string, { singular: string; plural: string }> = {
@@ -32,7 +32,7 @@ const BED_TYPE_LABELS: Record<string, { singular: string; plural: string }> = {
   queen: { singular: 'queen', plural: 'queen' },
   king: { singular: 'king', plural: 'king' },
   litera: { singular: 'litera', plural: 'literas' },
-  cuna: { singular: 'cuna', plural: 'cunas' },
+  cuna: { singular: 'cuna', plural: 'cunas' }, sofa_cama: { singular: 'sofá cama', plural: 'sofás cama' },
 }
 
 function bedLabel(bedType: string, quantity: number) {
