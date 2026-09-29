@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 import { useEffect, useMemo, useRef } from 'react'
 
-type Property = { id: string; name: string; cover_photo_url: string | null }
+type Property = { id: string; slug: string; name: string; cover_photo_url: string | null }
 type BlockedDate = { property_id: string; date: string }
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -145,7 +145,7 @@ export default function PublicAvailabilityGrid({
                 <td className="sticky left-0 bg-white z-10 px-2 py-2 text-navy-deep border-b border-stone/10 font-medium">
                   <div className="flex items-center gap-2 min-w-0">
                     <Link
-                      href={`/cabanas/${property.id}`}
+                      href={`/cabanas/${property.slug}`}
                       className="flex items-center gap-2 min-w-0 hover:underline"
                     >
                       {property.cover_photo_url ? (

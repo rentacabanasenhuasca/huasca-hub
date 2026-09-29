@@ -8,6 +8,8 @@ import ShareSearchLink from '@/components/ShareSearchLink'
 import PublicAvailabilityGrid from '@/components/PublicAvailabilityGrid'
 import HeroCarousel from '@/components/HeroCarousel'
 import SiteFooter from '@/components/SiteFooter'
+import type { Metadata } from 'next'
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
 
 // Cuántos días hacia adelante se muestran en el calendario de disponibilidad
 // de todas las propiedades, al pie de la página de inicio.
@@ -15,6 +17,7 @@ const AVAILABILITY_WINDOW_DAYS = 120
 
 type PublicProperty = {
   id: string
+  slug: string
   name: string
   capacity: number
   bedrooms: number
@@ -32,6 +35,12 @@ type PublicProperty = {
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
+}
+
+export const metadata: Metadata = {
+  title: `${SITE_NAME} — Renta de cabañas en Huasca de Ocampo, Hidalgo`,
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: '/' },
 }
 
 export default async function Home({
@@ -57,7 +66,7 @@ export default async function Home({
   const { data: properties } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity'
+      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity'
     )
     .eq('status', 'published')
     .order('name')
@@ -187,8 +196,38 @@ export default async function Home({
     })
     .filter((r) => r.fitsGuests && r.minNightsOk && r.isFree)
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'LodgingBusiness',
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    image: `${SITE_URL}/logo.png`,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Huasca de Ocampo',
+      addressRegion: 'Hidalgo',
+      addressCountry: 'MX',
+    },
+    makesOffer: typedProperties.map((p) => ({
+      '@type': 'Offer',
+      name: p.name,
+      url: `${SITE_URL}/cabanas/${p.slug}`,
+      priceCurrency: 'MXN',
+      price: p.weekday_price_mxn,
+    })),
+  }
+
   return (
     <div className="font-body min-h-full bg-cream">
+      {/* Datos estructurados para buscadores e IA (Google, ChatGPT,
+          Perplexity, etc.): quién es el negocio, dónde está y qué cabañas
+          ofrece, para que puedan citar/recomendar el sitio con datos
+          correctos en vez de adivinar. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Nav flotante — con el buscador compacto siempre a la mano, no
           solo el que está grande en el hero (ver más abajo). */}
       <div className="sticky top-4 z-30 px-4">
@@ -287,7 +326,7 @@ export default async function Home({
                   return (
                     <Link
                       key={property.id}
-                      href={`/cabanas/${property.id}?${query.toString()}`}
+                      href={`/cabanas/${property.slug}?${query.toString()}`}
                       className="group block rounded-3xl border border-stone/10 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-deep/10"
                     >
                       {coverByProperty.get(property.id) ? (
@@ -344,6 +383,7 @@ export default async function Home({
               <PublicAvailabilityGrid
                 properties={typedProperties.map((p) => ({
                   id: p.id,
+                  slug: p.slug,
                   name: p.name,
                   cover_photo_url: coverByProperty.get(p.id) ?? null,
                 }))}

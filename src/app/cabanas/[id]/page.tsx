@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
 import { parseGuestsFromParams, fitsProperty, guestsSummary } from '@/lib/occupancy'
 import { getBookingQuote } from '@/lib/booking-quote'
+import { isUuid } from '@/lib/is-uuid'
 import GuestPicker from '@/components/GuestPicker'
 import CompactSearchForm from '@/components/CompactSearchForm'
 import PhotoGallery from '@/components/PhotoGallery'
 import SiteFooter from '@/components/SiteFooter'
+import type { Metadata } from 'next'
+import { SITE_URL, SITE_NAME } from '@/lib/site'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -16,6 +19,55 @@ function todayStr() {
 function waLink(phone: string, text: string) {
   const digits = phone.replace(/[^\d]/g, '')
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const supabase = createServiceClient()
+
+  const { data: property } = await supabase
+    .from('properties')
+    .select('id, name, slug, description, capacity, bedrooms, bathrooms, weekday_price_mxn')
+    .eq(isUuid(id) ? 'id' : 'slug', id)
+    .eq('status', 'published')
+    .maybeSingle()
+
+  if (!property) return {}
+
+  const { data: cover } = await supabase
+    .from('property_photos')
+    .select('url')
+    .eq('property_id', property.id)
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const title = `${property.name} — Cabaña en Huasca de Ocampo hasta ${property.capacity} huéspedes`
+  const description =
+    property.description?.slice(0, 155) ||
+    `${property.name}: cabaña de ${property.bedrooms} recámaras y ${property.bathrooms} baños en Huasca de Ocampo, Hidalgo. Reserva en línea con ${SITE_NAME}, precios y disponibilidad en tiempo real.`
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/cabanas/${property.slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `/cabanas/${property.slug}`,
+      images: cover?.url ? [{ url: cover.url }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: cover?.url ? [cover.url] : undefined,
+    },
+  }
 }
 
 export default async function CabanaPage({
@@ -41,24 +93,29 @@ export default async function CabanaPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children'
+      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children'
     )
-    .eq('id', id)
+    .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
     .maybeSingle()
 
   if (!property) notFound()
 
+  // URLs viejas compartidas con el UUID crudo siguen funcionando (arriba),
+  // pero si alguien llega así lo mandamos a la URL bonita con el slug para
+  // que eso sea lo que quede indexado y se comparta de aquí en adelante.
+  if (property.slug !== id) redirect(`/cabanas/${property.slug}`)
+
   const [{ data: photos }, { data: propertyAmenities }, { data: host }] = await Promise.all([
     supabase
       .from('property_photos')
       .select('url, category, description, sort_order')
-      .eq('property_id', id)
+      .eq('property_id', property.id)
       .order('sort_order', { ascending: true }),
     supabase
       .from('property_amenities')
       .select('description, amenities(label, category)')
-      .eq('property_id', id),
+      .eq('property_id', property.id),
     supabase.from('hosts').select('name, phone, email').eq('id', property.host_id).maybeSingle(),
   ])
 
@@ -98,8 +155,31 @@ export default async function CabanaPage({
     hasSearch ? ` del ${checkin} al ${checkout} para ${guestsSummary(guests)}` : ''
   }.`
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'LodgingBusiness',
+    name: property.name,
+    description: property.description || undefined,
+    url: `${SITE_URL}/cabanas/${property.slug}`,
+    image: (photos ?? []).map((p) => p.url),
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Huasca de Ocampo',
+      addressRegion: 'Hidalgo',
+      addressCountry: 'MX',
+    },
+    petsAllowed: property.pet_friendly,
+    numberOfRooms: property.bedrooms,
+    occupancy: { '@type': 'QuantitativeValue', maxValue: property.capacity },
+    priceRange: `$${property.weekday_price_mxn} - $${property.weekend_price_mxn} MXN`,
+  }
+
   return (
     <div className="font-body min-h-full bg-cream">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="sticky top-4 z-30 px-4">
         <div className="max-w-5xl mx-auto flex flex-col gap-3 rounded-[28px] border border-stone/10 bg-white/90 backdrop-blur-md px-5 py-3 shadow-[0_1px_3px_rgba(16,27,40,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-2 sm:pr-2.5">
           <div className="flex items-center justify-between sm:contents">
@@ -247,7 +327,7 @@ export default async function CabanaPage({
                       <span>${Math.round(total ?? 0).toLocaleString('es-MX')} MXN</span>
                     </div>
                     <Link
-                      href={`/cabanas/${id}/reservar?checkin=${checkin}&checkout=${checkout}&adults=${guests.adults}&children=${guests.children}&infants=${guests.infants}&pets=${guests.pets}`}
+                      href={`/cabanas/${property.slug}/reservar?checkin=${checkin}&checkout=${checkout}&adults=${guests.adults}&children=${guests.children}&infants=${guests.infants}&pets=${guests.pets}`}
                       className="mt-4 block text-center w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition"
                     >
                       Reservar y pagar

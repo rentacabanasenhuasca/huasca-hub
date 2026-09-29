@@ -3,6 +3,7 @@ import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { createServiceClient } from "@/lib/supabase/service";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, CORE_KEYWORDS } from "@/lib/site";
 
 // Tipografía más bold y contemporánea que las fuentes de sistema que se
 // usaban antes (Georgia + sans del sistema). Fraunces en su corte más
@@ -26,8 +27,38 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Huasca Hub — Panel de anfitrión",
-  description: "Plataforma propia de reservas de Huasca Retreats",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Cabañas y espacios de descanso en Huasca de Ocampo`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: CORE_KEYWORDS,
+  applicationName: SITE_NAME,
+  authors: [{ name: SITE_NAME }],
+  generator: "Next.js",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "es_MX",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Cabañas y espacios de descanso en Huasca de Ocampo`,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    images: [{ url: "/logo.png", width: 800, height: 750, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — Cabañas en Huasca de Ocampo`,
+    description: SITE_DESCRIPTION,
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

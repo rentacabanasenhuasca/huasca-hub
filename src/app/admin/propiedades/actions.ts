@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireHost } from '@/lib/hosts'
+import { generateUniqueSlug } from '@/lib/slug'
 
 type ActionState = { error: string | null }
 
@@ -133,9 +134,11 @@ export async function createProperty(_prev: ActionState, formData: FormData): Pr
     return { error: 'Define un precio entre semana y fin de semana mayor a 0.' }
   }
 
+  const slug = await generateUniqueSlug(supabase, payload.name)
+
   const { data: property, error } = await supabase
     .from('properties')
-    .insert({ ...payload, host_id: host.id })
+    .insert({ ...payload, host_id: host.id, slug })
     .select('id')
     .single()
 

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
+import { isUuid } from '@/lib/is-uuid'
 import { parseGuestsFromParams, guestsSummary } from '@/lib/occupancy'
 import { getBookingQuote, type QuoteProperty } from '@/lib/booking-quote'
 import ReservarClient from './ReservarClient'
@@ -28,13 +29,19 @@ export default async function ReservarPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, capacity, base_occupancy, max_children, max_infants, infants_count_toward_capacity, pet_friendly, weekday_price_mxn, weekend_price_mxn, extra_guest_fee_mxn, min_nights'
+      'id, host_id, name, slug, capacity, base_occupancy, max_children, max_infants, infants_count_toward_capacity, pet_friendly, weekday_price_mxn, weekend_price_mxn, extra_guest_fee_mxn, min_nights'
     )
-    .eq('id', id)
+    .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
     .maybeSingle()
 
   if (!property) notFound()
+  if (property.slug !== id) {
+    const qs = new URLSearchParams(
+      Object.entries(sp).filter(([, v]) => v != null) as [string, string][]
+    ).toString()
+    redirect(`/cabanas/${property.slug}/reservar${qs ? `?${qs}` : ''}`)
+  }
 
   const { data: allAddons } = await supabase
     .from('addons')
@@ -60,7 +67,7 @@ export default async function ReservarPage({
 
   const addons = (allAddons ?? []).filter((a) => {
     const allowed = restrictedTo.get(a.id)
-    return !allowed || allowed.has(id)
+    return !allowed || allowed.has(property.id)
   })
 
   const guests = parseGuestsFromParams(sp)
@@ -88,7 +95,7 @@ export default async function ReservarPage({
     <div className="font-body min-h-full bg-cream">
       <div className="sticky top-4 z-30 px-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between rounded-[28px] border border-stone/10 bg-white/90 backdrop-blur-md pl-5 pr-2.5 py-2 shadow-[0_1px_3px_rgba(16,27,40,0.08)]">
-          <Link href={`/cabanas/${id}`} className="text-xs text-stone hover:text-navy-deep transition">
+          <Link href={`/cabanas/${property.slug}`} className="text-xs text-stone hover:text-navy-deep transition">
             ← Volver a {property.name}
           </Link>
           <Link href="/" aria-label="Huasca Retreats" className="shrink-0">
@@ -111,7 +118,7 @@ export default async function ReservarPage({
           <div className="mt-8 rounded-3xl border border-burnt-orange/25 bg-white p-6 text-center">
             <p className="text-burnt-orange text-sm">{problem}</p>
             <Link
-              href={`/cabanas/${id}`}
+              href={`/cabanas/${property.slug}`}
               className="mt-4 inline-block rounded-full bg-navy px-5 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition"
             >
               Elegir otras fechas
@@ -127,7 +134,7 @@ export default async function ReservarPage({
             </div>
 
             <ReservarClient
-              propertyId={id}
+              propertyId={property.id}
               checkin={checkin!}
               checkout={checkout!}
               guests={guests}
