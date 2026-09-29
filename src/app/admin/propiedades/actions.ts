@@ -138,7 +138,7 @@ async function syncBeds(
   const rows = bedTypes
     .map((bedType, i) => ({
       property_id: propertyId,
-      room_type: roomTypes[i] === 'altillo_tapanco' ? 'altillo_tapanco' : 'recamara',
+      room_type: roomTypes[i] === 'altillo_tapanco' || roomTypes[i] === 'otro' ? roomTypes[i] : 'recamara',
       bed_type: bedType,
       quantity: Math.max(1, Number(quantities[i]) || 1),
       sort_order: i,
