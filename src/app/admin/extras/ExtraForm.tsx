@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uuid } from '@/lib/uuid'
 
 export type AddonRecord = {
   id: string
@@ -59,7 +60,7 @@ export default function ExtraForm({
     try {
       const supabase = createClient()
       const ext = file.name.split('.').pop()
-      const path = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+      const path = `${uuid()}${ext ? `.${ext}` : ''}`
       const { error } = await supabase.storage.from('property-photos').upload(path, file, {
         cacheControl: '3600',
         upsert: false,

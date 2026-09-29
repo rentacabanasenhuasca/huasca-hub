@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { uuid } from '@/lib/uuid'
 
 export type Amenity = { id: string; category: string; label: string; sort_order: number }
 export type PropertyRecord = {
@@ -95,8 +96,8 @@ export default function PropertyForm({
   )
   const [photoRows, setPhotoRows] = useState<PhotoRow[]>(
     photos.length > 0
-      ? photos.map((p) => ({ ...p, _key: crypto.randomUUID() }))
-      : [{ url: '', category: '', description: '', _key: crypto.randomUUID() }]
+      ? photos.map((p) => ({ ...p, _key: uuid() }))
+      : [{ url: '', category: '', description: '', _key: uuid() }]
   )
   const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(new Set())
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
@@ -114,7 +115,7 @@ export default function PropertyForm({
     try {
       const supabase = createClient()
       const ext = file.name.split('.').pop()
-      const path = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+      const path = `${uuid()}${ext ? `.${ext}` : ''}`
 
       const { error } = await supabase.storage.from('property-photos').upload(path, file, {
         cacheControl: '3600',
@@ -162,7 +163,7 @@ export default function PropertyForm({
           newKeys.push(next[firstEmptyIdx]._key)
           firstEmptyIdx = -1
         } else {
-          const key = crypto.randomUUID()
+          const key = uuid()
           next.push({ url: '', category: '', description: '', _key: key })
           newKeys.push(key)
         }
@@ -591,7 +592,7 @@ export default function PropertyForm({
           <button
             type="button"
             onClick={() =>
-              setPhotoRows((rows) => [...rows, { url: '', category: '', description: '', _key: crypto.randomUUID() }])
+              setPhotoRows((rows) => [...rows, { url: '', category: '', description: '', _key: uuid() }])
             }
             className="text-sm text-gold underline underline-offset-2"
           >

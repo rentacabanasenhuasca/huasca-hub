@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { addHeroMedia, deleteHeroMedia, toggleHeroMedia, moveHeroMedia } from './actions'
+import { uuid } from '@/lib/uuid'
 
 type HeroMedia = {
   id: string
@@ -32,7 +33,7 @@ export default function HeroMediaManager({ items }: { items: HeroMedia[] }) {
     try {
       const supabase = createClient()
       const ext = file.name.split('.').pop()
-      const path = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+      const path = `${uuid()}${ext ? `.${ext}` : ''}`
 
       const { error: uploadError } = await supabase.storage.from('site-media').upload(path, file, {
         cacheControl: '3600',
