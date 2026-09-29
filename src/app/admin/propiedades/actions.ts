@@ -228,3 +228,83 @@ export async function deleteProperty(propertyId: string) {
   revalidatePath('/admin/propiedades')
   redirect('/admin/propiedades')
 }
+
+// Crea una copia completa de una propiedad (datos, amenidades, fotos y
+// camas) como borrador, para no tener que llenar todo de cero cuando una
+// cabaña es muy parecida a otra que ya existe. No copia los calendarios
+// iCal conectados ni las plantillas de correo — esas son específicas de
+// cada propiedad y el anfitrión las configura de nuevo si las necesita.
+export async function duplicateProperty(propertyId: string) {
+  const host = await requireHost()
+  const supabase = await createClient()
+
+  const { data: property } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('id', propertyId)
+    .eq('host_id', host.id)
+    .maybeSingle()
+  if (!property) return { error: 'Propiedad no encontrada.' }
+
+  const { id: _id, slug: _slug, created_at: _createdAt, updated_at: _updatedAt, ...rest } =
+    property as Record<string, unknown>
+  const newName = `${property.name} (copia)`
+  const slug = await generateUniqueSlug(supabase, newName)
+
+  const { data: newProperty, error } = await supabase
+    .from('properties')
+    .insert({ ...rest, name: newName, slug, status: 'draft' })
+    .select('id')
+    .single()
+
+  if (error || !newProperty) {
+    return { error: `No se pudo duplicar la propiedad: ${error?.message}` }
+  }
+
+  try {
+    const [{ data: amenities }, { data: photos }, { data: beds }] = await Promise.all([
+      supabase.from('property_amenities').select('amenity_id, description').eq('property_id', propertyId),
+      supabase
+        .from('property_photos')
+        .select('url, category, description, sort_order')
+        .eq('property_id', propertyId),
+      supabase
+        .from('property_beds')
+        .select('room_type, bed_type, quantity, sort_order')
+        .eq('property_id', propertyId),
+    ])
+
+    if (amenities && amenities.length > 0) {
+      await supabase.from('property_amenities').insert(
+        amenities.map((a) => ({ property_id: newProperty.id, amenity_id: a.amenity_id, description: a.description }))
+      )
+    }
+    if (photos && photos.length > 0) {
+      await supabase.from('property_photos').insert(
+        photos.map((p) => ({
+          property_id: newProperty.id,
+          url: p.url,
+          category: p.category,
+          description: p.description,
+          sort_order: p.sort_order,
+        }))
+      )
+    }
+    if (beds && beds.length > 0) {
+      await supabase.from('property_beds').insert(
+        beds.map((b) => ({
+          property_id: newProperty.id,
+          room_type: b.room_type,
+          bed_type: b.bed_type,
+          quantity: b.quantity,
+          sort_order: b.sort_order,
+        }))
+      )
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Error copiando los detalles de la propiedad.' }
+  }
+
+  revalidatePath('/admin/propiedades')
+  redirect(`/admin/propiedades/${newProperty.id}?duplicada=1`)
+}
