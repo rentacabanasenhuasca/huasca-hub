@@ -348,6 +348,53 @@ export async function setMinNightsOverride(selections: Selection[], minNights: n
   return { error: null, days }
 }
 
+// Fija (o quita) el precio para fechas exactas, con prioridad absoluta sobre
+// el precio base de la propiedad y sobre cualquier regla de precio vigente
+// ese día — igual que "Noches mínimas" pero para precio. Se usa para
+// cambiar el precio directamente al seleccionar celdas con el mouse, sin
+// tener que crear/editar una regla. priceMxn = null quita el ajuste y
+// vuelve al precio normal (base o regla aplicada).
+export async function setPriceOverride(selections: Selection[], priceMxn: number | null) {
+  await requireHost()
+  const supabase = await createClient()
+
+  if (selections.length === 0) return { error: 'No hay fechas seleccionadas.' }
+  if (priceMxn != null && priceMxn < 0) return { error: 'El precio no puede ser negativo.' }
+
+  const byProperty = groupByProperty(selections)
+
+  if (priceMxn != null) {
+    const rows = selections.map((s) => ({ property_id: s.propertyId, date: s.date, price_mxn: priceMxn }))
+    const { error } = await supabase.from('price_overrides').upsert(rows, { onConflict: 'property_id,date' })
+    if (error) return { error: `No se pudo guardar: ${error.message}` }
+  } else {
+    const results = await Promise.all(
+      [...byProperty.entries()].map(([propertyId, dates]) =>
+        supabase.from('price_overrides').delete().eq('property_id', propertyId).in('date', dates)
+      )
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return { error: `No se pudo quitar: ${failed.error.message}` }
+  }
+
+  const allDates = selections.map((s) => s.date).sort()
+  await recomputeCalendarRange(supabase, [...byProperty.keys()], allDates[0], allDates[allDates.length - 1])
+
+  const updated = await Promise.all(
+    [...byProperty.entries()].map(([propertyId, dates]) =>
+      supabase
+        .from('calendar_days')
+        .select('property_id, date, price_mxn, min_nights, applied_rule_id')
+        .eq('property_id', propertyId)
+        .in('date', dates)
+    )
+  )
+  const days = updated.flatMap((r) => r.data ?? [])
+
+  revalidatePath('/admin/calendario')
+  return { error: null, days }
+}
+
 // Crea una reserva directamente desde el panel (sin pasar por Stripe/Mercado
 // Pago) — por ejemplo cuando el huésped paga en efectivo, por transferencia,
 // o Christian quiere registrar algo que ya cerró por WhatsApp. Se le puede

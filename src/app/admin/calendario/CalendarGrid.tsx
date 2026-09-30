@@ -8,6 +8,7 @@ import {
   loadCalendarWindow,
   setManualBlock,
   setMinNightsOverride,
+  setPriceOverride,
   getBookingDetails,
   cancelBooking,
   moveBooking,
@@ -180,6 +181,7 @@ export default function CalendarGrid({
   const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [minNightsInput, setMinNightsInput] = useState('')
+  const [priceInput, setPriceInput] = useState('')
   const [blockNoteInput, setBlockNoteInput] = useState('')
 
   const [showManualBooking, setShowManualBooking] = useState(false)
@@ -575,6 +577,36 @@ export default function CalendarGrid({
       ])
       setSelected(new Set())
       setMinNightsInput('')
+    })
+  }
+
+  // Precio fijo para las fechas exactas seleccionadas, con prioridad
+  // absoluta sobre el precio base y sobre cualquier regla aplicada ese día
+  // (igual que Noches mínimas, pero para precio) — para cambiar el precio
+  // directamente al seleccionar celdas con el mouse, sin crear una regla.
+  function savePrice() {
+    if (selected.size === 0) return
+    setError(null)
+    const trimmed = priceInput.trim()
+    const n = trimmed === '' ? null : Number(trimmed)
+    if (n != null && (!Number.isFinite(n) || n < 0)) {
+      setError('El precio debe ser un número válido (o vacío para quitar el ajuste).')
+      return
+    }
+    const selections = selectionToSelections()
+    startTransition(async () => {
+      const res = await setPriceOverride(selections, n)
+      if (res?.error) {
+        setError(res.error)
+        return
+      }
+      const keySet = new Set(selections.map((s) => key(s.propertyId, s.date)))
+      setCalendarDaysState((prev) => [
+        ...prev.filter((cd) => !keySet.has(key(cd.property_id, cd.date))),
+        ...(res.days ?? []),
+      ])
+      setSelected(new Set())
+      setPriceInput('')
     })
   }
 
@@ -1025,6 +1057,34 @@ export default function CalendarGrid({
             {isPending ? 'Guardando…' : 'Guardar noches mínimas'}
           </button>
           <span className="text-xs text-stone">Deja el campo vacío y guarda para quitar el ajuste.</span>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-stone/10">
+          <label>
+            <span className="block text-xs font-medium text-stone uppercase tracking-wide mb-1">
+              Precio fijo (MXN)
+            </span>
+            <input
+              type="number"
+              min={0}
+              placeholder="Ej. 3500"
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              disabled={selected.size === 0}
+              className="w-28 rounded-lg border border-stone/30 bg-white px-3 py-1.5 text-sm text-navy-deep disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={selected.size === 0 || isPending}
+            onClick={savePrice}
+            className="rounded-lg bg-navy px-4 py-1.5 text-sm font-medium text-cream hover:bg-navy-deep transition disabled:opacity-40"
+          >
+            {isPending ? 'Guardando…' : 'Guardar precio'}
+          </button>
+          <span className="text-xs text-stone">
+            Gana sobre cualquier regla aplicada. Deja el campo vacío y guarda para quitar el ajuste.
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-stone/10">
