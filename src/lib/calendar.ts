@@ -71,7 +71,7 @@ export async function recomputeCalendarRange(
 ) {
   if (propertyIds.length === 0) return
 
-  const [{ data: properties }, { data: applications }, { data: overrides }] = await Promise.all([
+  const [{ data: properties }, { data: applications }, { data: overrides }, { data: priceOverrides }] = await Promise.all([
     supabase
       .from('properties')
       .select('id, weekday_price_mxn, weekend_price_mxn, min_nights, min_nights_by_day, extra_guest_fee_mxn')
@@ -90,12 +90,21 @@ export async function recomputeCalendarRange(
       .in('property_id', propertyIds)
       .gte('date', startDate)
       .lte('date', endDate),
+    supabase
+      .from('price_overrides')
+      .select('property_id, date, price_mxn')
+      .in('property_id', propertyIds)
+      .gte('date', startDate)
+      .lte('date', endDate),
   ])
 
   const propertyMap = new Map<string, PropertyBase>((properties ?? []).map((p) => [p.id, p]))
   const apps = (applications ?? []) as unknown as ApplicationRow[]
   const overrideMap = new Map<string, number>(
     (overrides ?? []).map((o) => [`${o.property_id}|${o.date}`, o.min_nights])
+  )
+  const priceOverrideMap = new Map<string, number>(
+    (priceOverrides ?? []).map((o) => [`${o.property_id}|${o.date}`, Number(o.price_mxn)])
   )
 
   const dates = eachDate(startDate, endDate)
@@ -127,12 +136,19 @@ export async function recomputeCalendarRange(
 
       const winner = covering[0]?.pricing_rules ?? null
       const basePrice = isWeekendNight(date) ? property.weekend_price_mxn : property.weekday_price_mxn
+      const priceOverride = priceOverrideMap.get(`${propertyId}|${date}`)
 
       let price = basePrice
       if (winner?.price_override_mxn != null) {
         price = Number(winner.price_override_mxn)
       } else if (winner?.price_adjustment_pct != null) {
         price = Math.round(basePrice * (1 + Number(winner.price_adjustment_pct) / 100) * 100) / 100
+      }
+      // El precio fijado a mano para esta fecha exacta gana siempre, incluso
+      // sobre una regla de precio ya aplicada (mismo criterio que noches
+      // mínimas: el ajuste manual por fecha es el más específico).
+      if (priceOverride != null) {
+        price = priceOverride
       }
 
       // Orden de prioridad para noches mínimas: 1) override manual de esta
