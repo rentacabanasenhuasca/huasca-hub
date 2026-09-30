@@ -78,11 +78,11 @@ export async function loadCalendarWindow(propertyIds: string[], startDate: strin
   await requireHost()
   const supabase = await createClient()
 
-  if (propertyIds.length === 0) return { days: [], blocked: [] }
+  if (propertyIds.length === 0) return { days: [], blocked: [], minNightsOverrides: [], priceOverrides: [] }
 
   await recomputeCalendarRange(supabase, propertyIds, startDate, endDate)
 
-  const [{ data }, { data: blocked }] = await Promise.all([
+  const [{ data }, { data: blocked }, { data: minNightsOverrides }, { data: priceOverrides }] = await Promise.all([
     supabase
       .from('calendar_days')
       .select('property_id, date, price_mxn, min_nights, applied_rule_id')
@@ -95,9 +95,26 @@ export async function loadCalendarWindow(propertyIds: string[], startDate: strin
       .in('property_id', propertyIds)
       .gte('date', startDate)
       .lte('date', endDate),
+    supabase
+      .from('min_nights_overrides')
+      .select('property_id, date, min_nights')
+      .in('property_id', propertyIds)
+      .gte('date', startDate)
+      .lte('date', endDate),
+    supabase
+      .from('price_overrides')
+      .select('property_id, date, price_mxn')
+      .in('property_id', propertyIds)
+      .gte('date', startDate)
+      .lte('date', endDate),
   ])
 
-  return { days: data ?? [], blocked: blocked ?? [] }
+  return {
+    days: data ?? [],
+    blocked: blocked ?? [],
+    minNightsOverrides: minNightsOverrides ?? [],
+    priceOverrides: priceOverrides ?? [],
+  }
 }
 
 // Detalle completo de una reserva directa, para el panel que se abre al

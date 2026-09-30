@@ -49,6 +49,8 @@ type BlockedDate = {
   external_summary: string | null
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
 }
+type MinNightsOverride = { property_id: string; date: string; min_nights: number }
+type PriceOverride = { property_id: string; date: string; price_mxn: number }
 type BookingDetails = {
   id: string
   guest_name: string
@@ -94,6 +96,20 @@ function blockedKind(b: BlockedDate): 'airbnb' | 'booking' | 'ical-otro' | 'dire
   if (platform === 'airbnb') return 'airbnb'
   if (platform === 'booking') return 'booking'
   return 'ical-otro'
+}
+
+// Texto legible de por qué está bloqueada una fecha — el mismo que se usa
+// en el tooltip (title) de la celda y en el panel de detalle de la
+// selección.
+function blockedLabel(b: BlockedDate): string {
+  const kind = blockedKind(b)
+  const icalSource = icalSourceOf(b)
+  if (kind === 'airbnb' || kind === 'booking') {
+    return `Bloqueado — ${icalSource?.label ?? (kind === 'airbnb' ? 'Airbnb' : 'Booking.com')}${b.external_summary ? ` (${b.external_summary})` : ''}`
+  }
+  if (kind === 'direct') return 'Bloqueado — reserva directa en este sitio'
+  if (kind === 'manual') return `Bloqueado manualmente${b.note ? ` — ${b.note}` : ''}`
+  return `Bloqueado — ${icalSource?.label ?? 'calendario externo'}${b.external_summary ? ` (${b.external_summary})` : ''}`
 }
 
 function solidColorFor(kind: ReturnType<typeof blockedKind>): string {
@@ -163,6 +179,8 @@ export default function CalendarGrid({
   calendarDays,
   applications,
   blockedDates,
+  minNightsOverrides,
+  priceOverrides,
 }: {
   year: number
   month: number
@@ -173,6 +191,8 @@ export default function CalendarGrid({
   calendarDays: CalendarDay[]
   applications: Application[]
   blockedDates: BlockedDate[]
+  minNightsOverrides: MinNightsOverride[]
+  priceOverrides: PriceOverride[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -199,6 +219,8 @@ export default function CalendarGrid({
   const [loadedEnd, setLoadedEnd] = useState(windowEnd)
   const [calendarDaysState, setCalendarDaysState] = useState(calendarDays)
   const [blockedDatesState, setBlockedDatesState] = useState(blockedDates)
+  const [minNightsOverridesState, setMinNightsOverridesState] = useState(minNightsOverrides)
+  const [priceOverridesState, setPriceOverridesState] = useState(priceOverrides)
   const [loadingMore, setLoadingMore] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -238,6 +260,18 @@ export default function CalendarGrid({
     for (const b of blockedDatesState) m.set(key(b.property_id, b.date), b)
     return m
   }, [blockedDatesState])
+
+  const minNightsOverrideMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const o of minNightsOverridesState) m.set(key(o.property_id, o.date), o.min_nights)
+    return m
+  }, [minNightsOverridesState])
+
+  const priceOverrideMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const o of priceOverridesState) m.set(key(o.property_id, o.date), Number(o.price_mxn))
+    return m
+  }, [priceOverridesState])
 
   const [detailsFor, setDetailsFor] = useState<{ propertyId: string; date: string } | null>(null)
   // Se capturan al abrir el panel (en vez de recalcularse en cada render
@@ -360,6 +394,48 @@ export default function CalendarGrid({
     return m
   }, [rules])
 
+  // Detalle completo de la celda seleccionada (solo cuando hay exactamente
+  // una): de dónde sale el precio y las noches mínimas que se ven en esa
+  // celda (ajuste manual de esa fecha, regla de precio, o valor base de la
+  // propiedad) y si está bloqueada y por qué. Con más de una celda
+  // seleccionada no se muestra — cada una puede tener condiciones distintas.
+  const selectionDetail = useMemo(() => {
+    if (selected.size !== 1) return null
+    const k = [...selected][0]
+    const [propertyId, date] = k.split('|')
+    const property = properties.find((p) => p.id === propertyId)
+    if (!property) return null
+
+    const cd = dayMap.get(k)
+    const blocked = blockedMap.get(k)
+    const minOverride = minNightsOverrideMap.get(k)
+    const priceOverride = priceOverrideMap.get(k)
+    const rule = cd?.applied_rule_id ? rules.find((r) => r.id === cd.applied_rule_id) : undefined
+
+    const priceSource =
+      priceOverride != null
+        ? 'fijado a mano para esta fecha'
+        : rule
+          ? `regla "${rule.name}"`
+          : 'precio base de la propiedad'
+    const minNightsSource =
+      minOverride != null
+        ? 'fijado a mano para esta fecha'
+        : rule
+          ? `regla "${rule.name}" (o el mínimo de la propiedad si esa regla no fija noches mínimas)`
+          : 'mínimo de la propiedad'
+
+    return {
+      propertyName: property.name,
+      date,
+      price: cd?.price_mxn ?? null,
+      priceSource,
+      minNights: cd?.min_nights ?? property.min_nights,
+      minNightsSource,
+      blocked,
+    }
+  }, [selected, properties, dayMap, blockedMap, minNightsOverrideMap, priceOverrideMap, rules])
+
   // Posiciona el scroll para que el mes pedido (year/month) quede al
   // principio de la vista, al montar el componente (page.tsx remonta este
   // componente con una key nueva cada vez que cambia la ventana del
@@ -399,6 +475,8 @@ export default function CalendarGrid({
         const res = await loadCalendarWindow(propertyIds, newStart, newEnd)
         setCalendarDaysState((prev) => [...prev, ...res.days])
         setBlockedDatesState((prev) => [...prev, ...(res.blocked ?? [])])
+        setMinNightsOverridesState((prev) => [...prev, ...(res.minNightsOverrides ?? [])])
+        setPriceOverridesState((prev) => [...prev, ...(res.priceOverrides ?? [])])
         setLoadedEnd(newEnd)
       } else {
         const newEnd = addDaysStr(loadedStart, -1)
@@ -408,6 +486,8 @@ export default function CalendarGrid({
         const res = await loadCalendarWindow(propertyIds, newStart, newEnd)
         setCalendarDaysState((prev) => [...res.days, ...prev])
         setBlockedDatesState((prev) => [...(res.blocked ?? []), ...prev])
+        setMinNightsOverridesState((prev) => [...(res.minNightsOverrides ?? []), ...prev])
+        setPriceOverridesState((prev) => [...(res.priceOverrides ?? []), ...prev])
         setLoadedStart(newStart)
       }
     } finally {
@@ -575,6 +655,10 @@ export default function CalendarGrid({
         ...prev.filter((cd) => !keySet.has(key(cd.property_id, cd.date))),
         ...(res.days ?? []),
       ])
+      setMinNightsOverridesState((prev) => [
+        ...prev.filter((o) => !keySet.has(key(o.property_id, o.date))),
+        ...(n != null ? selections.map((s) => ({ property_id: s.propertyId, date: s.date, min_nights: n })) : []),
+      ])
       setSelected(new Set())
       setMinNightsInput('')
     })
@@ -604,6 +688,10 @@ export default function CalendarGrid({
       setCalendarDaysState((prev) => [
         ...prev.filter((cd) => !keySet.has(key(cd.property_id, cd.date))),
         ...(res.days ?? []),
+      ])
+      setPriceOverridesState((prev) => [
+        ...prev.filter((o) => !keySet.has(key(o.property_id, o.date))),
+        ...(n != null ? selections.map((s) => ({ property_id: s.propertyId, date: s.date, price_mxn: n })) : []),
       ])
       setSelected(new Set())
       setPriceInput('')
@@ -920,16 +1008,7 @@ export default function CalendarGrid({
                   const blocked = blockedMap.get(key(property.id, d.date))
                   const kind = blocked ? blockedKind(blocked) : null
                   const solidColor = kind === 'airbnb' || kind === 'booking' || kind === 'direct' ? SOURCE_COLOR[kind] : null
-                  const icalSource = blocked ? icalSourceOf(blocked) : null
-                  const cellTitle = !blocked
-                    ? undefined
-                    : kind === 'airbnb' || kind === 'booking'
-                      ? `Bloqueado — ${icalSource?.label ?? (kind === 'airbnb' ? 'Airbnb' : 'Booking.com')}${blocked.external_summary ? ` (${blocked.external_summary})` : ''}`
-                      : kind === 'direct'
-                        ? 'Bloqueado — reserva directa en este sitio'
-                        : kind === 'manual'
-                          ? `Bloqueado manualmente${blocked.note ? ` — ${blocked.note}` : ''}`
-                          : `Bloqueado — ${icalSource?.label ?? 'calendario externo'}${blocked.external_summary ? ` (${blocked.external_summary})` : ''}`
+                  const cellTitle = blocked ? blockedLabel(blocked) : undefined
                   return (
                     <td
                       key={d.date}
@@ -999,6 +1078,40 @@ export default function CalendarGrid({
           )}
           {error && <span className="text-sm text-burnt-orange">{error}</span>}
         </div>
+
+        {selectionDetail && (
+          <div className="rounded-lg border border-stone/20 bg-cream/40 p-3 text-sm space-y-1">
+            <p className="font-medium text-navy-deep">
+              {selectionDetail.propertyName} · {selectionDetail.date}
+            </p>
+            <p className="text-navy-deep">
+              Precio:{' '}
+              <span className="font-medium">
+                {selectionDetail.price != null
+                  ? `$${Math.round(Number(selectionDetail.price)).toLocaleString('es-MX')}`
+                  : '—'}
+              </span>{' '}
+              <span className="text-stone">({selectionDetail.priceSource})</span>
+            </p>
+            <p className="text-navy-deep">
+              Noches mínimas: <span className="font-medium">{selectionDetail.minNights}</span>{' '}
+              <span className="text-stone">({selectionDetail.minNightsSource})</span>
+            </p>
+            <p className="text-navy-deep">
+              Disponibilidad:{' '}
+              {selectionDetail.blocked ? (
+                <span className="font-medium text-burnt-orange">{blockedLabel(selectionDetail.blocked)}</span>
+              ) : (
+                <span className="font-medium text-olive-deep">Disponible</span>
+              )}
+            </p>
+          </div>
+        )}
+        {selected.size > 1 && (
+          <p className="text-xs text-stone">
+            Selecciona una sola fecha para ver el detalle completo de sus condiciones.
+          </p>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-stone/10">
           <span className="text-xs font-medium text-stone uppercase tracking-wide w-full sm:w-auto">

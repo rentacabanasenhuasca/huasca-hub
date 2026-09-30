@@ -67,7 +67,13 @@ export default async function CalendarioPage({
     await recomputeCalendarRange(supabase, propertyIds, start, end)
   }
 
-  const [{ data: calendarDays }, { data: applications }, { data: blockedDates }] = await Promise.all([
+  const [
+    { data: calendarDays },
+    { data: applications },
+    { data: blockedDates },
+    { data: minNightsOverrides },
+    { data: priceOverrides },
+  ] = await Promise.all([
     propertyIds.length > 0
       ? supabase
           .from('calendar_days')
@@ -88,6 +94,22 @@ export default async function CalendarioPage({
       ? supabase
           .from('blocked_dates')
           .select('property_id, date, source, note, booking_id, external_summary, ical_sources(platform, label)')
+          .in('property_id', propertyIds)
+          .gte('date', start)
+          .lte('date', end)
+      : Promise.resolve({ data: [] as never[] }),
+    propertyIds.length > 0
+      ? supabase
+          .from('min_nights_overrides')
+          .select('property_id, date, min_nights')
+          .in('property_id', propertyIds)
+          .gte('date', start)
+          .lte('date', end)
+      : Promise.resolve({ data: [] as never[] }),
+    propertyIds.length > 0
+      ? supabase
+          .from('price_overrides')
+          .select('property_id, date, price_mxn')
           .in('property_id', propertyIds)
           .gte('date', start)
           .lte('date', end)
@@ -124,6 +146,8 @@ export default async function CalendarioPage({
           calendarDays={calendarDays ?? []}
           applications={(applications ?? []) as unknown as Parameters<typeof CalendarGrid>[0]['applications']}
           blockedDates={blockedDates ?? []}
+          minNightsOverrides={minNightsOverrides ?? []}
+          priceOverrides={priceOverrides ?? []}
         />
       )}
     </div>
