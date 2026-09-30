@@ -73,7 +73,7 @@ type BookingDetails = {
 const SOURCE_COLOR: Record<string, string> = {
   airbnb: '#ec4899', // rosa
   booking: '#3b82f6', // azul
-  direct: '#333c26', // verde oliva de marca — reservas hechas en este sitio
+  direct: '#3f7a3a', // verde bosque vivo de marca (más visible que el olivo oscuro) — reservas hechas en este sitio
 }
 
 function icalSourceOf(b: BlockedDate): { platform: string; label: string } | null {
