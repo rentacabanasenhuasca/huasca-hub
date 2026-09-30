@@ -189,12 +189,18 @@ export default async function Home({
       return {
         property,
         total,
+        minNightsRequired,
         minNightsOk: nights.length >= minNightsRequired,
         fitsGuests,
         isFree,
       }
     })
-    .filter((r) => r.fitsGuests && r.minNightsOk && r.isFree)
+    // No se filtra por minNightsOk: si las fechas buscadas no alcanzan las
+    // noches mínimas, la cabaña sigue mostrándose como disponible (con la
+    // leyenda "Selecciona mínimo N noches" en vez del precio) — igual que
+    // Airbnb, en vez de desaparecer de los resultados como si no hubiera
+    // disponibilidad.
+    .filter((r) => r.fitsGuests && r.isFree)
 
     // Barajamos el orden en el que se muestran las tarjetas: sin esto, como la
     // consulta viene ordenada por nombre, propiedades con nombres parecidos
@@ -324,7 +330,7 @@ export default async function Home({
                 </div>
               )}
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map(({ property, total }) => {
+                {results.map(({ property, total, minNightsOk, minNightsRequired }) => {
                   const query = new URLSearchParams()
                   if (checkin) query.set('checkin', checkin)
                   if (checkout) query.set('checkout', checkout)
@@ -358,7 +364,11 @@ export default async function Home({
                           {property.pet_friendly ? ' · Pet friendly' : ''}
                         </p>
                         <p className="text-sm text-navy-deep mt-4 font-medium">
-                          {total != null ? (
+                          {total != null && !minNightsOk ? (
+                            <span className="text-burnt-orange font-medium">
+                              Selecciona mínimo {minNightsRequired} noches
+                            </span>
+                          ) : total != null ? (
                             <>
                               ${Math.round(total).toLocaleString('es-MX')} MXN{' '}
                               <span className="text-stone font-normal">
