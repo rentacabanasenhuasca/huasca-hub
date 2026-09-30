@@ -9,6 +9,7 @@ import GuestPicker from '@/components/GuestPicker'
 import CompactSearchForm from '@/components/CompactSearchForm'
 import PhotoGallery from '@/components/PhotoGallery'
 import SiteFooter from '@/components/SiteFooter'
+import TrackViewContent from '@/components/TrackViewContent'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME } from '@/lib/site'
 
@@ -235,6 +236,7 @@ export default async function CabanaPage({
       </div>
 
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-6 sm:pt-10 sm:pb-8">
+        <TrackViewContent id={property.id} name={property.name} price={property.weekday_price_mxn} />
         <PhotoGallery photos={photos ?? []} alt={property.name} />
 
         <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10">
