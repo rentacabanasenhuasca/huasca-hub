@@ -57,6 +57,7 @@ export default function RulesManager({ rules, properties }: { rules: RuleRecord[
                     rule={rule}
                     submitLabel="Guardar cambios"
                     onDone={() => setEditingId(null)}
+                    properties={properties}
                   />
                   <button
                     type="button"

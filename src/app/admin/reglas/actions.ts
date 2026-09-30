@@ -107,23 +107,56 @@ export async function updateRule(
 
   if (error) return { error: `No se pudo guardar: ${error.message}` }
 
+  // Si desde el formulario se marcaron unidades + fechas nuevas, se suman a
+  // las aplicaciones ya existentes de esta regla (no reemplaza ni quita las
+  // que ya había — eso se maneja desde el calendario).
+  const propertyIds = formData.getAll('property_ids').map(String).filter(Boolean)
+  const applyStart = String(formData.get('apply_start') || '')
+  const applyEnd = String(formData.get('apply_end') || '')
+  let newApplyError: string | null = null
+
+  if (propertyIds.length > 0 && applyStart && applyEnd) {
+    if (applyEnd < applyStart) {
+      newApplyError = 'La regla se guardó, pero "Hasta" no puede ser antes que "Desde" — aplícala desde el calendario.'
+    } else {
+      const { data: owned } = await supabase.from('properties').select('id').eq('host_id', host.id).in('id', propertyIds)
+      const ownedIds = new Set((owned ?? []).map((p) => p.id))
+      const validIds = propertyIds.filter((id) => ownedIds.has(id))
+
+      if (validIds.length > 0) {
+        const rows = validIds.map((propertyId) => ({
+          rule_id: ruleId,
+          property_id: propertyId,
+          start_date: applyStart,
+          end_date: applyEnd,
+        }))
+        const { error: applyError } = await supabase.from('rule_applications').insert(rows)
+        if (applyError) {
+          newApplyError = `La regla se guardó, pero no se pudo aplicar a las nuevas fechas: ${applyError.message}`
+        } else {
+          await recomputeCalendarRange(supabase, validIds, applyStart, applyEnd)
+        }
+      }
+    }
+  }
+
   // La edición de la regla puede cambiar precios ya calculados: recalcula
-  // todo el rango donde esta regla está aplicada.
+  // todo el rango donde esta regla está aplicada (incluye lo que ya tenía).
   const { data: apps } = await supabase
     .from('rule_applications')
     .select('property_id, start_date, end_date')
     .eq('rule_id', ruleId)
 
   if (apps && apps.length > 0) {
-    const propertyIds = [...new Set(apps.map((a) => a.property_id))]
+    const allPropertyIds = [...new Set(apps.map((a) => a.property_id))]
     const start = apps.reduce((min, a) => (a.start_date < min ? a.start_date : min), apps[0].start_date)
     const end = apps.reduce((max, a) => (a.end_date > max ? a.end_date : max), apps[0].end_date)
-    await recomputeCalendarRange(supabase, propertyIds, start, end)
+    await recomputeCalendarRange(supabase, allPropertyIds, start, end)
   }
 
   revalidatePath('/admin/reglas')
   revalidatePath('/admin/calendario')
-  return { error: null }
+  return { error: newApplyError }
 }
 
 export async function deleteRule(ruleId: string) {

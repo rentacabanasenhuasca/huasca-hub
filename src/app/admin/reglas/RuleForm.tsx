@@ -44,10 +44,12 @@ export default function RuleForm({
   rule?: RuleRecord
   submitLabel: string
   onDone?: () => void
-  // Solo se pasa al crear una regla nueva — deja elegir de una vez en qué
-  // cabañas y fechas aplicarla, para no tener que ir luego al calendario a
-  // seleccionar celda por celda. Al editar una regla existente no se
-  // muestra (sus aplicaciones ya existentes se manejan desde el calendario).
+  // Deja elegir de una vez en qué cabañas y fechas aplicar la regla, para no
+  // tener que ir luego al calendario a seleccionar celda por celda. Se pasa
+  // tanto al crear una regla nueva como al editar una existente — al editar,
+  // las unidades marcadas aquí se SUMAN a las aplicaciones que ya tenga (no
+  // reemplaza ni quita las existentes; para quitar una aplicación se hace
+  // desde el calendario).
   properties?: PropertyOption[]
 }) {
   const [state, formAction, pending] = useActionState(action, { error: null })
@@ -191,8 +193,9 @@ export default function RuleForm({
         <div className="rounded-lg border border-stone/20 bg-cream/40 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <span className={labelClass + ' mb-0'}>
-              Unidades donde aplicar esta regla (opcional — si no eliges ninguna, la regla se
-              crea y la aplicas después desde el calendario)
+              {rule
+                ? 'Aplicar esta regla también a otras unidades/fechas (opcional — se suma a lo ya aplicado; para quitar una aplicación existente usa el calendario)'
+                : 'Unidades donde aplicar esta regla (opcional — si no eliges ninguna, la regla se crea y la aplicas después desde el calendario)'}
             </span>
             <button
               type="button"
