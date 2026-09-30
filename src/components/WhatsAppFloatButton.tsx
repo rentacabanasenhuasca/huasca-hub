@@ -6,6 +6,7 @@
 // /admin/configuracion. Así, si Christian vende esta misma plataforma a
 // otro hospedaje, cada quien pone su propio número ahí sin tocar código.
 import { usePathname } from 'next/navigation'
+import { trackMetaEvent } from '@/lib/meta-pixel'
 
 function digitsOnly(phone: string) {
   return phone.replace(/[^\d]/g, '')
@@ -28,6 +29,7 @@ export default function WhatsAppFloatButton({ phone }: { phone: string | null })
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Escríbenos por WhatsApp"
+      onClick={() => trackMetaEvent('Contact')}
       className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] shadow-lg shadow-black/20 transition hover:scale-105 hover:brightness-105 sm:h-16 sm:w-16"
     >
       <svg viewBox="0 0 32 32" className="h-8 w-8 sm:h-9 sm:w-9" fill="#ffffff" aria-hidden="true">
