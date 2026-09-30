@@ -8,6 +8,7 @@ import type { GuestInfo } from './booking-finalize'
 import { createStripePaymentIntent, finalizeStripeBooking, createMercadoPagoPayment, validateDiscountCodeAction } from './checkout-actions'
 import StripePaymentForm from './StripePaymentForm'
 import MercadoPagoPaymentForm from './MercadoPagoPaymentForm'
+import { trackMetaEvent } from '@/lib/meta-pixel'
 
 type Provider = 'stripe' | 'mercadopago'
 
@@ -117,6 +118,7 @@ export default function ReservarClient({
   const infoComplete = guestInfo.name.trim().length > 1 && /\S+@\S+\.\S+/.test(guestInfo.email) && guestInfo.phone.trim().length >= 8
 
   async function chooseProvider(next: Provider) {
+    trackMetaEvent('AddPaymentInfo', { value: total, currency: 'MXN', content_ids: [propertyId] })
     setError(null)
     setProvider(next)
     if (next === 'stripe' && !clientSecret) {
@@ -320,7 +322,10 @@ export default function ReservarClient({
             className="w-full rounded-xl border border-stone/25 px-3 py-2.5 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
           />
           <button
-            onClick={() => setConfirmed(true)}
+            onClick={() => {
+              trackMetaEvent('InitiateCheckout', { value: total, currency: 'MXN', content_ids: [propertyId] })
+              setConfirmed(true)
+            }}
             disabled={!infoComplete}
             className="w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition disabled:opacity-40"
           >
