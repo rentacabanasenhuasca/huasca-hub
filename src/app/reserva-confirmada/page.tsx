@@ -9,12 +9,14 @@
 // aunque la reserva sí se había guardado bien. Al mandar al huésped a una
 // URL aparte, ese refresco ya no la afecta.
 //
-// De paso, esta es la página ideal para instalar más adelante el Meta Pixel
-// / eventos de conversión (Purchase / Lead) que se disparan solo cuando una
-// reserva de verdad se completó.
+// De paso, esta es la página ideal para el evento Purchase del Meta Pixel
+// (ver <TrackPurchase />) — se dispara aquí y no desde el formulario de
+// pago, porque solo se llega a esta URL cuando la reserva ya se guardó de
+// verdad (no en intentos fallidos o abandonados).
 import Link from 'next/link'
 import Image from 'next/image'
 import { createServiceClient } from '@/lib/supabase/service'
+import TrackPurchase from '@/components/TrackPurchase'
 
 export default async function ReservaConfirmadaPage({
   searchParams,
@@ -28,7 +30,7 @@ export default async function ReservaConfirmadaPage({
     ? (
         await supabase
           .from('bookings')
-          .select('id, guest_name, check_in, check_out, properties ( name )')
+          .select('id, guest_name, check_in, check_out, property_id, total_price_mxn, properties ( name )')
           .eq('id', bookingId)
           .maybeSingle()
       ).data
@@ -42,6 +44,9 @@ export default async function ReservaConfirmadaPage({
 
   return (
     <div className="font-body min-h-full bg-cream flex flex-col">
+      {booking && (
+        <TrackPurchase bookingId={booking.id} propertyId={booking.property_id} value={booking.total_price_mxn} />
+      )}
       <div className="px-4 pt-4">
         <div className="max-w-md mx-auto flex justify-center">
           <Link href="/" aria-label="Huasca Retreats">
