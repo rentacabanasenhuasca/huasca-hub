@@ -199,7 +199,7 @@ export default function ReservarClient({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-navy-deep truncate">{addon.name}</p>
                     {addon.description && (
-                      <p className="text-xs text-stone line-clamp-2">{addon.description}</p>
+                      <p className="text-xs text-stone">{addon.description}</p>
                     )}
                     <p className="text-xs text-stone mt-0.5">
                       ${addon.price_mxn.toLocaleString('es-MX')} MXN{addon.unit === 'per_unit' ? ' c/u' : ''}
