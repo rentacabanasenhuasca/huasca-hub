@@ -54,12 +54,14 @@ export default async function Home({
     children?: string
     infants?: string
     pets?: string
+    jacuzzi?: string
   }>
 }) {
   const sp = await searchParams
   const { checkin, checkout } = sp
   const guests = parseGuestsFromParams(sp)
   const hasSearch = Boolean(checkin && checkout && checkout > checkin)
+  const jacuzziOnly = sp.jacuzzi === '1'
 
   const supabase = createServiceClient()
 
@@ -91,6 +93,20 @@ export default async function Home({
   const coverByProperty = new Map<string, string>()
   for (const photo of photos ?? []) {
     if (!coverByProperty.has(photo.property_id)) coverByProperty.set(photo.property_id, photo.url)
+  }
+
+  // Qué propiedades tienen la amenidad "Jacuzzi" — para el filtro rápido del
+  // buscador (mismo patrón que Airbnb: un chip que reduce los resultados a
+  // las cabañas con esa amenidad). Solo se consulta si hace falta, para no
+  // pagar este join en cada carga de la portada.
+  const jacuzziPropertyIds = new Set<string>()
+  if (jacuzziOnly && propertyIds.length > 0) {
+    const { data: jacuzziRows } = await supabase
+      .from('property_amenities')
+      .select('property_id, amenities!inner(label)')
+      .in('property_id', propertyIds)
+      .ilike('amenities.label', 'jacuzzi')
+    for (const row of jacuzziRows ?? []) jacuzziPropertyIds.add(row.property_id)
   }
 
   // Portada: fotos y/o video que el host sube desde /admin/portada. Si no
@@ -189,18 +205,13 @@ export default async function Home({
       return {
         property,
         total,
-        minNightsRequired,
         minNightsOk: nights.length >= minNightsRequired,
         fitsGuests,
         isFree,
       }
     })
-    // No se filtra por minNightsOk: si las fechas buscadas no alcanzan las
-    // noches mínimas, la cabaña sigue mostrándose como disponible (con la
-    // leyenda "Selecciona mínimo N noches" en vez del precio) — igual que
-    // Airbnb, en vez de desaparecer de los resultados como si no hubiera
-    // disponibilidad.
-    .filter((r) => r.fitsGuests && r.isFree)
+    .filter((r) => r.fitsGuests && r.minNightsOk && r.isFree)
+    .filter((r) => !jacuzziOnly || jacuzziPropertyIds.has(r.property.id))
 
     // Barajamos el orden en el que se muestran las tarjetas: sin esto, como la
     // consulta viene ordenada por nombre, propiedades con nombres parecidos
@@ -267,7 +278,12 @@ export default async function Home({
             </Link>
           </div>
           <div className="sm:order-2">
-            <CompactSearchForm defaultCheckin={checkin} defaultCheckout={checkout} defaultGuests={guests} />
+            <CompactSearchForm
+              defaultCheckin={checkin}
+              defaultCheckout={checkout}
+              defaultGuests={guests}
+              defaultJacuzzi={jacuzziOnly}
+            />
           </div>
         </div>
       </div>
@@ -330,7 +346,7 @@ export default async function Home({
                 </div>
               )}
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map(({ property, total, minNightsOk, minNightsRequired }) => {
+                {results.map(({ property, total }) => {
                   const query = new URLSearchParams()
                   if (checkin) query.set('checkin', checkin)
                   if (checkout) query.set('checkout', checkout)
@@ -364,11 +380,7 @@ export default async function Home({
                           {property.pet_friendly ? ' · Pet friendly' : ''}
                         </p>
                         <p className="text-sm text-navy-deep mt-4 font-medium">
-                          {total != null && !minNightsOk ? (
-                            <span className="text-burnt-orange font-medium">
-                              Selecciona mínimo {minNightsRequired} noches
-                            </span>
-                          ) : total != null ? (
+                          {total != null ? (
                             <>
                               ${Math.round(total).toLocaleString('es-MX')} MXN{' '}
                               <span className="text-stone font-normal">
