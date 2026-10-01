@@ -6,6 +6,7 @@ import { requireHost } from '@/lib/hosts'
 import { recomputeCalendarRange } from '@/lib/calendar'
 import { getStripe } from '@/lib/stripe'
 import { getMercadoPagoRefundClient } from '@/lib/mercadopago'
+import { sendBookingEmails } from '@/lib/booking-emails'
 
 export type Selection = { propertyId: string; date: string }
 
@@ -412,11 +413,43 @@ export async function setPriceOverride(selections: Selection[], priceMxn: number
   return { error: null, days }
 }
 
+// Correos configurados (habilitados, disparador "booking_created") de una
+// cabaña — para que el modal de reserva manual pueda mostrarle al host
+// cuáles existen y dejarlo elegir cuáles mandar (o ninguno).
+export async function getBookingEmailTemplates(propertyId: string) {
+  const host = await requireHost()
+  const supabase = await createClient()
+
+  const { data: property } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('id', propertyId)
+    .eq('host_id', host.id)
+    .maybeSingle()
+  if (!property) return { error: 'Esa cabaña no existe.', templates: [] }
+
+  const { data: templates, error } = await supabase
+    .from('email_templates')
+    .select('id, name, recipient_type')
+    .eq('property_id', propertyId)
+    .eq('trigger_event', 'booking_created')
+    .eq('enabled', true)
+    .order('created_at', { ascending: true })
+
+  if (error) return { error: `No se pudieron cargar los correos: ${error.message}`, templates: [] }
+  return { error: null, templates: templates ?? [] }
+}
+
 // Crea una reserva directamente desde el panel (sin pasar por Stripe/Mercado
 // Pago) — por ejemplo cuando el huésped paga en efectivo, por transferencia,
 // o Christian quiere registrar algo que ya cerró por WhatsApp. Se le puede
 // poner el monto exacto que se cobró (puede ser distinto al precio de
 // calendario). Bloquea las fechas igual que cualquier otra reserva directa.
+// sendEmails/templateIds: a diferencia de una reserva online (que siempre
+// manda todos los correos habilitados de la cabaña), aquí el host decide si
+// se manda algo y, si quiere, cuáles de los correos configurados mandar —
+// útil para reservas atrasadas, de prueba, o donde ya avisó por WhatsApp y
+// no quiere duplicar el aviso.
 export async function createManualBooking(input: {
   propertyId: string
   checkIn: string
@@ -430,6 +463,8 @@ export async function createManualBooking(input: {
   pets: boolean
   totalPriceMxn: number
   notes: string
+  sendEmails: boolean
+  templateIds: string[]
 }) {
   const host = await requireHost()
   const supabase = await createClient()
@@ -507,11 +542,28 @@ export async function createManualBooking(input: {
   }
 
   revalidatePath('/admin/calendario')
+
+  // Correos: "mejor esfuerzo" — la reserva ya quedó creada y bloqueada, no
+  // se revierte nada si el envío falla, solo se reporta de regreso al modal.
+  // Se manda SIEMPRE la lista exacta que llegó del modal (aunque esté
+  // vacía): así "desmarcar todos" con el interruptor prendido manda 0
+  // correos a propósito, en vez de caer de regreso a "todos los
+  // habilitados" como sí hace una reserva online (ver sendBookingEmails).
+  let emailResult: { sent: number; errors: string[] } | null = null
+  if (input.sendEmails) {
+    try {
+      emailResult = await sendBookingEmails(supabase, booking.id, input.templateIds)
+    } catch (err) {
+      emailResult = { sent: 0, errors: [`Fallo inesperado al mandar correos: ${(err as Error).message}`] }
+    }
+  }
+
   return {
     error: null,
     bookingId: booking.id,
     propertyId: input.propertyId,
     dates: nights,
+    emailResult,
   }
 }
 

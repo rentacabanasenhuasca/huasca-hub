@@ -1,9 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { createManualBooking } from './actions'
+import { useEffect, useState } from 'react'
+import { createManualBooking, getBookingEmailTemplates } from './actions'
 
 type Property = { id: string; name: string }
+
+type EmailTemplateOption = { id: string; name: string; recipient_type: 'guest' | 'admin' | 'custom' }
+
+const RECIPIENT_LABELS: Record<EmailTemplateOption['recipient_type'], string> = {
+  guest: 'al huésped',
+  admin: 'a mí (administrador)',
+  custom: 'a otro correo',
+}
 
 // Reserva creada a mano desde el panel — para pagos en efectivo,
 // transferencia, o algo que ya se cerró por WhatsApp y no pasó por Stripe ni
@@ -33,6 +41,42 @@ export default function ManualBookingModal({
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailResult, setEmailResult] = useState<{ sent: number; errors: string[] } | null | undefined>(undefined)
+
+  // Correos: por cabaña, qué plantillas (habilitadas) hay para elegir, y
+  // cuáles de ellas van marcadas para mandarse con esta reserva. Se
+  // recargan cada vez que cambia la cabaña elegida, porque cada una tiene
+  // sus propios correos configurados.
+  const [sendEmails, setSendEmails] = useState(true)
+  const [templates, setTemplates] = useState<EmailTemplateOption[]>([])
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!propertyId) {
+      setTemplates([])
+      setSelectedTemplateIds([])
+      return
+    }
+    setLoadingTemplates(true)
+    getBookingEmailTemplates(propertyId).then((res) => {
+      if (cancelled) return
+      const list = res.templates as EmailTemplateOption[]
+      setTemplates(list)
+      // Por default se mandan todos los que estén habilitados — igual que
+      // en una reserva online — y el host desmarca los que no quiera.
+      setSelectedTemplateIds(list.map((t) => t.id))
+      setLoadingTemplates(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [propertyId])
+
+  function toggleTemplate(id: string) {
+    setSelectedTemplateIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -51,13 +95,22 @@ export default function ManualBookingModal({
       pets,
       totalPriceMxn: Number(totalPriceMxn),
       notes,
+      sendEmails,
+      templateIds: selectedTemplateIds,
     })
     setSubmitting(false)
     if (res.error) {
       setError(res.error)
       return
     }
-    onCreated()
+    // Si se mandaron correos, mostramos un resumen antes de cerrar, en vez
+    // de cerrar de golpe — así el host se entera si algo no se mandó
+    // (ej. cabaña sin correo de administrador configurado).
+    if (res.emailResult) {
+      setEmailResult(res.emailResult)
+    } else {
+      onCreated()
+    }
   }
 
   const inputClass =
@@ -77,6 +130,30 @@ export default function ManualBookingModal({
           </button>
         </div>
 
+        {emailResult ? (
+          <div className="space-y-4">
+            <p className="text-sm text-navy-deep">
+              Reserva creada.{' '}
+              {emailResult.sent > 0
+                ? `Se ${emailResult.sent === 1 ? 'mandó 1 correo' : `mandaron ${emailResult.sent} correos`}.`
+                : 'No se mandó ningún correo.'}
+            </p>
+            {emailResult.errors.length > 0 && (
+              <ul className="list-disc pl-5 space-y-1 text-sm text-burnt-orange">
+                {emailResult.errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={onCreated}
+              className="w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition"
+            >
+              Listo
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className={labelClass}>Cabaña</label>
@@ -172,6 +249,43 @@ export default function ManualBookingModal({
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={inputClass} />
           </div>
 
+          <div className="rounded-lg border border-stone/15 bg-cream/40 p-3">
+            <label className="flex items-center gap-2 text-sm text-navy-deep">
+              <input
+                type="checkbox"
+                checked={sendEmails}
+                onChange={(e) => setSendEmails(e.target.checked)}
+                className="rounded border-stone/40"
+              />
+              Enviar correos de confirmación
+            </label>
+
+            {sendEmails && (
+              <div className="mt-2 pl-6 space-y-1.5">
+                {loadingTemplates && <p className="text-xs text-stone">Cargando correos de esta cabaña…</p>}
+                {!loadingTemplates && templates.length === 0 && (
+                  <p className="text-xs text-stone">
+                    Esta cabaña no tiene correos configurados — no se mandará nada. Configúralos en el panel de
+                    la cabaña, en &quot;Correos&quot;.
+                  </p>
+                )}
+                {!loadingTemplates &&
+                  templates.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-xs text-navy-deep">
+                      <input
+                        type="checkbox"
+                        checked={selectedTemplateIds.includes(t.id)}
+                        onChange={() => toggleTemplate(t.id)}
+                        className="rounded border-stone/40"
+                      />
+                      {t.name}{' '}
+                      <span className="text-stone">({RECIPIENT_LABELS[t.recipient_type]})</span>
+                    </label>
+                  ))}
+              </div>
+            )}
+          </div>
+
           {error && <p className="text-sm text-burnt-orange">{error}</p>}
 
           <button
@@ -182,6 +296,7 @@ export default function ManualBookingModal({
             {submitting ? 'Creando…' : 'Crear reserva'}
           </button>
         </form>
+        )}
       </div>
     </div>
   )
