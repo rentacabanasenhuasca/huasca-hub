@@ -101,7 +101,11 @@ function renderBodyHtml(text: string, data: Record<string, string>) {
     .join('')
 }
 
-export async function sendBookingEmails(supabase: SupabaseClient, bookingId: string) {
+export async function sendBookingEmails(
+  supabase: SupabaseClient,
+  bookingId: string,
+  templateIds?: string[]
+) {
   const { data: booking } = await supabase
     .from('bookings')
     .select(
@@ -166,12 +170,17 @@ export async function sendBookingEmails(supabase: SupabaseClient, bookingId: str
     addons: addonsText,
   }
 
-  const { data: templates } = await supabase
+  // templateIds: si se manda, restringe el envío a solo esos correos (ej.
+  // una reserva manual donde el host eligió a mano cuáles mandar) — si no
+  // se manda, se comporta como siempre: todos los habilitados de la cabaña.
+  let templatesQuery = supabase
     .from('email_templates')
     .select('id, recipient_type, recipient_emails, subject, body')
     .eq('property_id', property.id)
     .eq('trigger_event', 'booking_created')
     .eq('enabled', true)
+  if (templateIds) templatesQuery = templatesQuery.in('id', templateIds)
+  const { data: templates } = await templatesQuery
 
   const errors: string[] = []
   let sent = 0
