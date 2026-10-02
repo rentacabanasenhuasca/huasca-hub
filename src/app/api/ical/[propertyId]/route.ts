@@ -23,11 +23,31 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     return new NextResponse('Not found', { status: 404 })
   }
 
-  const { data: bookings } = await supabase
+  const { data: bookingsRaw } = await supabase
     .from('bookings')
     .select('id, check_in, check_out, guest_name')
     .eq('property_id', propertyId)
     .eq('status', 'confirmed')
+
+  // Red de seguridad: una reserva "confirmed" sin NINGÚN blocked_dates propio
+  // es una reserva huérfana/fantasma (normalmente por un bug al mover o
+  // cancelar una reserva a medias). No la mandamos a Airbnb/Booking aunque
+  // siga "confirmed" en la base — así, aunque algo más vuelva a dejar una
+  // reserva huérfana en el futuro, nunca se le avisa a una plataforma externa
+  // de una fecha ocupada que ya no existe en nuestro propio calendario.
+  const bookingIds = (bookingsRaw ?? []).map((b) => b.id)
+  const blockedBookingIds = new Set<string>()
+  if (bookingIds.length > 0) {
+    const { data: blocked } = await supabase
+      .from('blocked_dates')
+      .select('booking_id')
+      .eq('property_id', propertyId)
+      .in('booking_id', bookingIds)
+    for (const row of blocked ?? []) {
+      if (row.booking_id) blockedBookingIds.add(row.booking_id)
+    }
+  }
+  const bookings = (bookingsRaw ?? []).filter((b) => blockedBookingIds.has(b.id))
 
   const lines: string[] = [
     'BEGIN:VCALENDAR',
