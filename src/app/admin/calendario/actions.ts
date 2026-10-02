@@ -239,13 +239,14 @@ export async function moveBooking(bookingId: string, newPropertyId: string) {
     }
   }
 
-  const { error: updateError } = await supabase
-    .from('bookings')
-    .update({ property_id: newPropertyId })
-    .eq('id', bookingId)
-  if (updateError) return { error: `No se pudo mover la reserva: ${updateError.message}` }
-
-  await supabase.from('blocked_dates').delete().eq('booking_id', bookingId)
+  // IMPORTANTE: el orden de estos pasos importa. Antes, esta función borraba
+  // el bloqueo viejo ANTES de confirmar que el nuevo se pudiera crear — si el
+  // insert fallaba a la mitad, la reserva se quedaba "confirmed" pero sin
+  // NINGÚN blocked_dates: invisible en el calendario pero todavía exportada
+  // a Airbnb/Booking como ocupada para siempre ("reserva fantasma"). Ahora
+  // primero se crea el bloqueo nuevo y solo si eso tuvo éxito se actualiza la
+  // reserva y se borra el bloqueo viejo — si algo falla a la mitad, el peor
+  // caso es quedar con AMBOS bloqueos (demasiado bloqueado), nunca con cero.
   const rows = nights.map((date) => ({
     property_id: newPropertyId,
     date,
@@ -254,11 +255,21 @@ export async function moveBooking(bookingId: string, newPropertyId: string) {
   }))
   const { error: blockError } = await supabase.from('blocked_dates').insert(rows)
   if (blockError) {
-    // No se pudieron bloquear las fechas en el destino — revierte el cambio
-    // de propiedad para no dejar la reserva "movida" sin sus fechas bloqueadas.
-    await supabase.from('bookings').update({ property_id: booking.property_id }).eq('id', bookingId)
     return { error: `No se pudo bloquear las fechas en la cabaña destino: ${blockError.message}` }
   }
+
+  const { error: updateError } = await supabase
+    .from('bookings')
+    .update({ property_id: newPropertyId })
+    .eq('id', bookingId)
+  if (updateError) {
+    // No se pudo mover la reserva — revierte el bloqueo nuevo que sí se
+    // alcanzó a crear, para no dejar fechas bloqueadas de más.
+    await supabase.from('blocked_dates').delete().eq('booking_id', bookingId).eq('property_id', newPropertyId)
+    return { error: `No se pudo mover la reserva: ${updateError.message}` }
+  }
+
+  await supabase.from('blocked_dates').delete().eq('booking_id', bookingId).eq('property_id', booking.property_id)
 
   revalidatePath('/admin/calendario')
   return { error: null, oldPropertyId: booking.property_id, newPropertyId, dates: nights }
