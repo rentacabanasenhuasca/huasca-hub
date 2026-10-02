@@ -10,6 +10,7 @@ import CompactSearchForm from '@/components/CompactSearchForm'
 import PhotoGallery from '@/components/PhotoGallery'
 import SiteFooter from '@/components/SiteFooter'
 import TrackViewContent from '@/components/TrackViewContent'
+import TrackedBookLink from '@/components/TrackedBookLink'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME } from '@/lib/site'
 
@@ -370,12 +371,14 @@ export default async function CabanaPage({
                       <span>Total</span>
                       <span>${Math.round(total ?? 0).toLocaleString('es-MX')} MXN</span>
                     </div>
-                    <Link
+                    <TrackedBookLink
                       href={`/cabanas/${property.slug}/reservar?checkin=${checkin}&checkout=${checkout}&adults=${guests.adults}&children=${guests.children}&infants=${guests.infants}&pets=${guests.pets}`}
                       className="mt-4 block text-center w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition"
+                      propertyId={property.id}
+                      value={total ?? 0}
                     >
                       Reservar y pagar
-                    </Link>
+                    </TrackedBookLink>
                   </>
                 )}
               </div>
