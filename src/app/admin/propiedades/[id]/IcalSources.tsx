@@ -37,6 +37,20 @@ export default function IcalSources({
   const [error, setError] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // Si Airbnb/Booking se quedó con fechas bloqueadas que ya no existen de
+  // nuestro lado (p. ej. canceladas), a veces no las suelta aunque el
+  // calendario que le mandamos ya esté correcto — hay que darle un enlace
+  // "nuevo" para que lo trate como una fuente distinta y vuelva a importar
+  // todo desde cero. Como la ruta de export ignora cualquier parámetro extra
+  // en la URL, agregar `?v=...` no cambia nada de nuestro lado — solo hace
+  // que Airbnb/Booking lo vean como un link diferente.
+  const [regenToken, setRegenToken] = useState<string | null>(null)
+  const effectiveExportUrl = regenToken ? `${exportUrl}?v=${regenToken}` : exportUrl
+
+  function regenerateLink() {
+    setRegenToken(String(Date.now()))
+    setCopied(false)
+  }
 
   function handleAdd() {
     setError(null)
@@ -79,7 +93,7 @@ export default function IcalSources({
 
   async function copyExportLink() {
     try {
-      await navigator.clipboard.writeText(exportUrl)
+      await navigator.clipboard.writeText(effectiveExportUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -102,7 +116,12 @@ export default function IcalSources({
       <div>
         <span className={labelClass}>Enlace para exportar (dáselo a Airbnb/Booking)</span>
         <div className="flex gap-2">
-          <input readOnly value={exportUrl} className={`${inputClass} text-xs`} onFocus={(e) => e.target.select()} />
+          <input
+            readOnly
+            value={effectiveExportUrl}
+            className={`${inputClass} text-xs`}
+            onFocus={(e) => e.target.select()}
+          />
           <button
             type="button"
             onClick={copyExportLink}
@@ -110,7 +129,21 @@ export default function IcalSources({
           >
             {copied ? 'Copiado' : 'Copiar'}
           </button>
+          <button
+            type="button"
+            onClick={regenerateLink}
+            title="Genera un enlace nuevo para que Airbnb/Booking lo trate como una fuente distinta y reimporte todo desde cero — úsalo si una plataforma se quedó con fechas bloqueadas que ya liberaste de este lado."
+            className="shrink-0 rounded-lg border border-stone/30 px-3 py-2 text-xs font-medium text-navy-deep hover:bg-cream"
+          >
+            Regenerar enlace
+          </button>
         </div>
+        {regenToken && (
+          <p className="text-[11px] text-stone mt-1">
+            Enlace nuevo generado. Pégalo en Airbnb/Booking quitando primero el calendario viejo que tenían
+            vinculado (si no lo quitas, van a ver dos fuentes distintas).
+          </p>
+        )}
       </div>
 
       <div>
