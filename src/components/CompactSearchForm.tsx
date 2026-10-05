@@ -8,10 +8,7 @@
 import { useState } from 'react'
 import type { GuestCounts } from '@/lib/occupancy'
 import GuestPicker from '@/components/GuestPicker'
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { todayInMexicoStr } from '@/lib/dates'
 
 export default function CompactSearchForm({
   defaultCheckin,
@@ -38,7 +35,7 @@ export default function CompactSearchForm({
           type="date"
           name="checkin"
           defaultValue={defaultCheckin}
-          min={todayStr()}
+          min={todayInMexicoStr()}
           onChange={(e) => setCheckin(e.target.value)}
           required
           className="w-full rounded-lg border border-stone/25 px-2.5 py-1.5 text-xs text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
@@ -50,7 +47,7 @@ export default function CompactSearchForm({
           type="date"
           name="checkout"
           defaultValue={defaultCheckout}
-          min={checkin || todayStr()}
+          min={checkin || todayInMexicoStr()}
           required
           className="w-full rounded-lg border border-stone/25 px-2.5 py-1.5 text-xs text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
         />

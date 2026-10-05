@@ -10,6 +10,7 @@ import HeroCarousel from '@/components/HeroCarousel'
 import SiteFooter from '@/components/SiteFooter'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
+import { todayInMexicoStr } from '@/lib/dates'
 
 // Cuántos días hacia adelante se muestran en el calendario de disponibilidad
 // de todas las propiedades, al pie de la página de inicio.
@@ -31,10 +32,6 @@ type PublicProperty = {
   max_children: number | null
   max_infants: number | null
   infants_count_toward_capacity: boolean
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 export const metadata: Metadata = {
@@ -124,7 +121,7 @@ export default async function Home({
 
   // Calendario de disponibilidad de todas las cabañas (verde/naranja), al
   // pie de la página — independiente de si ya se hizo una búsqueda.
-  const availabilityStart = todayStr()
+  const availabilityStart = todayInMexicoStr()
   const availabilityEnd = (() => {
     const d = new Date(`${availabilityStart}T00:00:00Z`)
     d.setUTCDate(d.getUTCDate() + AVAILABILITY_WINDOW_DAYS)

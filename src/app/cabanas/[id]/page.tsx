@@ -13,10 +13,7 @@ import TrackViewContent from '@/components/TrackViewContent'
 import TrackedBookLink from '@/components/TrackedBookLink'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME } from '@/lib/site'
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { todayInMexicoStr } from '@/lib/dates'
 
 function waLink(phone: string, text: string) {
   const digits = phone.replace(/[^\d]/g, '')
@@ -308,7 +305,7 @@ export default async function CabanaPage({
                     type="date"
                     name="checkin"
                     defaultValue={checkin}
-                    min={todayStr()}
+                    min={todayInMexicoStr()}
                     required
                     className="w-full rounded-xl border border-stone/25 px-2.5 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
@@ -319,7 +316,7 @@ export default async function CabanaPage({
                     type="date"
                     name="checkout"
                     defaultValue={checkout}
-                    min={checkin || todayStr()}
+                    min={checkin || todayInMexicoStr()}
                     required
                     className="w-full rounded-xl border border-stone/25 px-2.5 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
                   />
