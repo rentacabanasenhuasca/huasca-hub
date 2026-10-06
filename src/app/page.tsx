@@ -177,7 +177,7 @@ export default async function Home({
     .map((property) => {
       const fitsGuests = fitsProperty(property, guests)
       if (!hasSearch) {
-        return { property, total: null as number | null, minNightsOk: true, fitsGuests, isFree: true }
+        return { property, total: null as number | null, minNightsOk: true, minNightsRequired: 1, fitsGuests, isFree: true }
       }
 
       const dayMap = dayMapByProperty.get(property.id)
@@ -203,11 +203,14 @@ export default async function Home({
         property,
         total,
         minNightsOk: nights.length >= minNightsRequired,
+        minNightsRequired,
         fitsGuests,
         isFree,
       }
     })
-    .filter((r) => r.fitsGuests && r.minNightsOk && r.isFree)
+    // Las cabañas libres que no cumplen el mínimo de noches NO se ocultan:
+    // se muestran con la leyenda "Selecciona mínimo N noches" (ver tarjeta).
+    .filter((r) => r.fitsGuests && r.isFree)
     .filter((r) => !jacuzziOnly || jacuzziPropertyIds.has(r.property.id))
 
     // Barajamos el orden en el que se muestran las tarjetas: sin esto, como la
@@ -343,7 +346,7 @@ export default async function Home({
                 </div>
               )}
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map(({ property, total }) => {
+                {results.map(({ property, total, minNightsOk, minNightsRequired }) => {
                   const query = new URLSearchParams()
                   if (checkin) query.set('checkin', checkin)
                   if (checkout) query.set('checkout', checkout)
@@ -377,7 +380,11 @@ export default async function Home({
                           {property.pet_friendly ? ' · Pet friendly' : ''}
                         </p>
                         <p className="text-sm text-navy-deep mt-4 font-medium">
-                          {total != null ? (
+                          {!minNightsOk ? (
+                            <span className="text-gold">
+                              Selecciona mínimo {minNightsRequired} noches
+                            </span>
+                          ) : total != null ? (
                             <>
                               ${Math.round(total).toLocaleString('es-MX')} MXN{' '}
                               <span className="text-stone font-normal">
