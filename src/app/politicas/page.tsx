@@ -4,6 +4,8 @@ export const metadata = {
   title: 'Políticas de Huasca Retreats',
   description:
     'Políticas de cancelaciones, cambios, reembolsos, garantía de reserva y uso del método de pago de Huasca Retreats.',
+  // Sin esto hereda canonical "/" del layout y Google la trata como copia de la portada.
+  alternates: { canonical: '/politicas' },
 }
 
 export default function PoliticasPage() {
