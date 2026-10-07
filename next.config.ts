@@ -30,6 +30,19 @@ const legacyRedirects: Record<string, string> = {
 };
 
 const nextConfig: NextConfig = {
+  // Fotos de Supabase optimizadas por nuestro servidor (ver src/lib/media.ts).
+  // minimumCacheTTL alto: los archivos tienen nombre único y no cambian, así
+  // que cada tamaño se baja de Supabase una sola vez por mes como máximo.
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "fdrirnhvfawipdvrraav.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+    minimumCacheTTL: 2678400,
+  },
   async redirects() {
     return Object.entries(legacyRedirects).flatMap(([source, destination]) => [
       { source, destination, permanent: true },
