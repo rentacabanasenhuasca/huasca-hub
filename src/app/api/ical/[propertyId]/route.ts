@@ -67,6 +67,48 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     )
   }
 
+  // Bloqueos manuales del panel (fechas cerradas a mano, p. ej. una reserva
+  // por WhatsApp o una cabaña en mantenimiento): también deben cerrarse en
+  // Airbnb/Booking. Solo se exportan los de origen "manual" — los que vienen
+  // de importar el iCal de otra plataforma NO se reenvían, para no crear un
+  // ciclo de bloqueos entre plataformas.
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: manual } = await supabase
+    .from('blocked_dates')
+    .select('date')
+    .eq('property_id', propertyId)
+    .eq('source', 'manual')
+    .gte('date', today)
+    .order('date')
+  const nextDay = (d: string) => {
+    const x = new Date(`${d}T00:00:00Z`)
+    x.setUTCDate(x.getUTCDate() + 1)
+    return x.toISOString().slice(0, 10)
+  }
+  let rangeStart: string | null = null
+  let rangeEnd: string | null = null // exclusivo (día siguiente al último bloqueado)
+  const flush = () => {
+    if (!rangeStart || !rangeEnd) return
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:manual-${rangeStart}-${propertyId}@huasca-hub`,
+      `DTSTART;VALUE=DATE:${toIcsDate(rangeStart)}`,
+      `DTEND;VALUE=DATE:${toIcsDate(rangeEnd)}`,
+      `SUMMARY:No disponible — ${property.name}`,
+      'END:VEVENT'
+    )
+  }
+  for (const row of manual ?? []) {
+    if (rangeEnd === row.date) {
+      rangeEnd = nextDay(row.date)
+    } else {
+      flush()
+      rangeStart = row.date
+      rangeEnd = nextDay(row.date)
+    }
+  }
+  flush()
+
   lines.push('END:VCALENDAR')
 
   return new NextResponse(lines.join('\r\n'), {
