@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { cachedMedia, optimizedImage } from '@/lib/media'
 
 export type HeroMediaItem = { id: string; media_type: 'image' | 'video'; url: string }
 
@@ -32,7 +33,7 @@ export default function HeroCarousel({ items }: { items: HeroMediaItem[] }) {
         >
           {item.media_type === 'video' ? (
             <video
-              src={item.url}
+              src={cachedMedia(item.url)}
               className="h-full w-full object-cover"
               autoPlay
               muted
@@ -42,7 +43,7 @@ export default function HeroCarousel({ items }: { items: HeroMediaItem[] }) {
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.url} alt="" className="h-full w-full object-cover" />
+            <img src={optimizedImage(item.url, 1920)} alt="" className="h-full w-full object-cover" />
           )}
         </div>
       ))}

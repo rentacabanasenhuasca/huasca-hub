@@ -5,6 +5,7 @@
 // las fotos que subió el host — antes solo se veían esas primeras 5 y no
 // había forma de ver el resto.
 import { useEffect, useState } from 'react'
+import { optimizedImage } from '@/lib/media'
 
 type Photo = { url: string; category: string | null; description: string | null }
 
@@ -38,7 +39,7 @@ export default function PhotoGallery({ photos, alt }: { photos: Photo[]; alt: st
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2 h-64 sm:h-[420px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={photos[0].url}
+            src={optimizedImage(photos[0].url, 1080)}
             alt={alt}
             className="col-span-4 sm:col-span-2 row-span-2 h-full w-full object-cover cursor-pointer"
             onClick={() => setOpen(true)}
@@ -47,7 +48,8 @@ export default function PhotoGallery({ photos, alt }: { photos: Photo[]; alt: st
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={i}
-              src={p.url}
+              src={optimizedImage(p.url, 640)}
+              loading="lazy"
               alt={p.description ?? ''}
               className="hidden sm:block h-full w-full object-cover cursor-pointer"
               onClick={() => setOpen(true)}
@@ -84,7 +86,7 @@ export default function PhotoGallery({ photos, alt }: { photos: Photo[]; alt: st
             {photos.map((p, i) => (
               <figure key={i} className="rounded-2xl overflow-hidden bg-white/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt={p.description ?? ''} className="w-full h-auto object-cover" />
+                <img src={optimizedImage(p.url, 1080)} loading="lazy" alt={p.description ?? ''} className="w-full h-auto object-cover" />
                 {(p.category || p.description) && (
                   <figcaption className="px-3 py-2 text-xs text-cream/70">
                     {[p.category, p.description].filter(Boolean).join(' — ')}

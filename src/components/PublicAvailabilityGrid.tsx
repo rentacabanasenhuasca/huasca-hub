@@ -8,6 +8,7 @@ import Link from 'next/link'
 // en vez de paginar por mes.
 
 import { useEffect, useMemo, useRef } from 'react'
+import { optimizedImage } from '@/lib/media'
 
 type Property = { id: string; slug: string; name: string; cover_photo_url: string | null }
 type BlockedDate = { property_id: string; date: string }
@@ -151,7 +152,8 @@ export default function PublicAvailabilityGrid({
                       {property.cover_photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={property.cover_photo_url}
+                          src={optimizedImage(property.cover_photo_url, 64)}
+                          loading="lazy"
                           alt=""
                           className="h-7 w-7 rounded-md object-cover shrink-0 border border-stone/15"
                         />
