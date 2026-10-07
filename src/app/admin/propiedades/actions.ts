@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireHost } from '@/lib/hosts'
 import { generateUniqueSlug } from '@/lib/slug'
+import { removeUnreferencedFiles } from '@/lib/storage-cleanup'
 
 type ActionState = { error: string | null }
 
@@ -106,6 +107,7 @@ async function syncPhotos(
   const categories = formData.getAll('photo_category').map(String)
   const descriptions = formData.getAll('photo_description').map(String)
 
+  const { data: previous } = await supabase.from('property_photos').select('url').eq('property_id', propertyId)
   await supabase.from('property_photos').delete().eq('property_id', propertyId)
 
   const rows = urls
@@ -122,6 +124,11 @@ async function syncPhotos(
     const { error } = await supabase.from('property_photos').insert(rows)
     if (error) throw new Error(`No se pudieron guardar las fotos: ${error.message}`)
   }
+
+  // Fotos que se quitaron en el formulario: borrar el archivo de Storage si
+  // ya ninguna otra propiedad lo usa.
+  const kept = new Set(rows.map((r) => r.url))
+  await removeUnreferencedFiles((previous ?? []).map((r) => r.url).filter((u) => !kept.has(u)))
 }
 
 async function syncBeds(
@@ -240,7 +247,9 @@ export async function deleteProperty(propertyId: string) {
   const host = await requireHost()
   const supabase = await createClient()
 
+  const { data: photos } = await supabase.from('property_photos').select('url').eq('property_id', propertyId)
   await supabase.from('properties').delete().eq('id', propertyId).eq('host_id', host.id)
+  await removeUnreferencedFiles((photos ?? []).map((r) => r.url))
 
   revalidatePath('/admin/propiedades')
   redirect('/admin/propiedades')
