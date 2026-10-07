@@ -3,6 +3,8 @@ import { LegalPageShell, Section, SubHeading, List, Callout } from '@/components
 export const metadata = {
   title: 'Reglamento — Huasca Retreats',
   description: 'Reglamento de estancia: horarios, mascotas, comportamiento y más.',
+  // Sin esto hereda canonical "/" del layout y Google la trata como copia de la portada.
+  alternates: { canonical: '/reglamento' },
 }
 
 export default function ReglamentoPage() {
