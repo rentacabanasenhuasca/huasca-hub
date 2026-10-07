@@ -13,6 +13,6 @@ export const config = {
      * Aplica a todas las rutas excepto archivos estáticos e imágenes,
      * para no interferir con el rendimiento de assets.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|media/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)',
   ],
 }
