@@ -196,9 +196,26 @@ export async function updateProperty(
   const payload = buildPropertyPayload(formData)
   if (!payload.name) return { error: 'El nombre de la propiedad es obligatorio.' }
 
+  // Mientras la propiedad siga en borrador (todavía no es pública), su URL se
+  // regenera a partir del nombre al renombrarla. Así una cabaña creada con
+  // "Duplicar" ("Glasshouse Natural (copia)") y luego renombrada a
+  // "Glasshouse Galería" queda en /cabanas/glasshouse-galeria y no en
+  // /cabanas/glasshouse-natural-copia-copia-copia. Ya publicada, la URL no
+  // se toca para no romper ligas compartidas ni lo indexado por Google.
+  const { data: current } = await supabase
+    .from('properties')
+    .select('name, status')
+    .eq('id', propertyId)
+    .eq('host_id', host.id)
+    .maybeSingle()
+  const slugUpdate =
+    current && current.status === 'draft' && current.name !== payload.name
+      ? { slug: await generateUniqueSlug(supabase, payload.name, propertyId) }
+      : {}
+
   const { error } = await supabase
     .from('properties')
-    .update({ ...payload, updated_at: new Date().toISOString() })
+    .update({ ...payload, ...slugUpdate, updated_at: new Date().toISOString() })
     .eq('id', propertyId)
     .eq('host_id', host.id)
 
