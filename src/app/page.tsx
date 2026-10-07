@@ -11,6 +11,7 @@ import SiteFooter from '@/components/SiteFooter'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
+import { optimizedImage } from '@/lib/media'
 
 // Cuántos días hacia adelante se muestran en el calendario de disponibilidad
 // de todas las propiedades, al pie de la página de inicio.
@@ -364,7 +365,8 @@ export default async function Home({
                       {coverByProperty.get(property.id) ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={coverByProperty.get(property.id)}
+                          src={optimizedImage(coverByProperty.get(property.id), 640)}
+                          loading="lazy"
                           alt={property.name}
                           className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
