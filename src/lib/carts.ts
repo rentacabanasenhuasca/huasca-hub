@@ -386,3 +386,89 @@ export async function processAbandonedCarts() {
   }
   return { checked: carts?.length ?? 0, notified, emailed }
 }
+
+/**
+ * Trae a la lista de carritos los pagos de Stripe que se quedaron a medias
+ * (incompletos o con tarjeta rechazada) de los últimos días. Sirve para
+ * recuperar lo que pasó antes de que existiera el seguimiento de carritos.
+ * No manda ningún aviso: solo los agrega al panel. Si un pago ya terminó en
+ * reserva, o ya está en la lista, no se duplica.
+ */
+export async function importStripeCarts(hostId: string, days = 10) {
+  const { getStripe } = await import('@/lib/stripe')
+  const stripe = getStripe()
+  const supabase = createServiceClient()
+  const since = Math.floor(Date.now() / 1000) - days * 86400
+
+  const { data: properties } = await supabase.from('properties').select('id').eq('host_id', hostId)
+  const ownProperties = new Set((properties ?? []).map((p) => p.id))
+
+  let imported = 0
+  let skipped = 0
+  for await (const pi of stripe.paymentIntents.list({ created: { gte: since }, limit: 100, expand: ['data.customer'] })) {
+    if (pi.status === 'succeeded' || pi.status === 'canceled') continue
+    const meta = pi.metadata ?? {}
+    const propertyId = meta.property_id
+    if (!propertyId || !ownProperties.has(propertyId) || !DATE_RE.test(meta.checkin ?? '') || !DATE_RE.test(meta.checkout ?? '')) {
+      skipped += 1
+      continue
+    }
+
+    const { data: existingBooking } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('stripe_payment_intent_id', pi.id)
+      .limit(1)
+      .maybeSingle()
+    if (existingBooking) continue
+
+    const customer = typeof pi.customer === 'object' && pi.customer && !('deleted' in pi.customer && pi.customer.deleted)
+      ? (pi.customer as { name?: string | null; email?: string | null; phone?: string | null })
+      : null
+    const email = (customer?.email ?? meta.guest_email ?? '').toLowerCase()
+
+    // Si ese huésped terminó reservando después (con otro intento de pago),
+    // no es un carrito abandonado.
+    if (email) {
+      const { data: laterBooking } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('check_in', meta.checkin)
+        .eq('status', 'confirmed')
+        .ilike('guest_email', email)
+        .limit(1)
+        .maybeSingle()
+      if (laterBooking) continue
+    }
+
+    const createdIso = new Date(pi.created * 1000).toISOString()
+    const failed = Boolean(pi.last_payment_error)
+    const { error } = await supabase.from('checkout_carts').upsert(
+      {
+        id: crypto.randomUUID(),
+        stripe_payment_intent_id: pi.id,
+        host_id: hostId,
+        property_id: propertyId,
+        check_in: meta.checkin,
+        check_out: meta.checkout,
+        adults: 1,
+        quoted_total_mxn: pi.amount / 100,
+        guest_name: clip(customer?.name ?? meta.guest_name, 120),
+        guest_email: email || null,
+        guest_phone: clip(customer?.phone, 40) || null,
+        guest_notes: 'Importado de Stripe (sin número de huéspedes)',
+        stage: failed ? 'pago_rechazado' : 'pago_iniciado',
+        payment_provider: 'stripe',
+        last_error: failed ? clip(pi.last_payment_error?.message, 300) : null,
+        host_notified_at: new Date().toISOString(),
+        created_at: createdIso,
+        updated_at: createdIso,
+      },
+      { onConflict: 'stripe_payment_intent_id', ignoreDuplicates: true }
+    )
+    if (error) console.warn('[carritos] import stripe', pi.id, error.message)
+    else imported += 1
+  }
+  return { imported, skipped }
+}
