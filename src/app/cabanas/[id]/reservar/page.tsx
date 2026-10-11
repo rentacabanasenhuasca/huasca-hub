@@ -19,6 +19,7 @@ export default async function ReservarPage({
     children?: string
     infants?: string
     pets?: string
+    carrito?: string
   }>
 }) {
   const { id } = await params
@@ -71,6 +72,19 @@ export default async function ReservarPage({
   })
 
   const guests = parseGuestsFromParams(sp)
+
+  // Liga de "retomar reserva" de un carrito abandonado: precarga los datos
+  // que el huésped ya había llenado (el id del carrito no es adivinable).
+  let resumeCart: { id: string; guest_name: string | null; guest_email: string | null; guest_phone: string | null; guest_notes: string | null } | null = null
+  if (sp.carrito && isUuid(sp.carrito)) {
+    const { data } = await supabase
+      .from('checkout_carts')
+      .select('id, guest_name, guest_email, guest_phone, guest_notes, stage')
+      .eq('id', sp.carrito)
+      .eq('property_id', property.id)
+      .maybeSingle()
+    if (data && data.stage !== 'reservado') resumeCart = data
+  }
   const hasSearch = Boolean(checkin && checkout && checkout > checkin)
 
   const invalid = !hasSearch
@@ -142,6 +156,17 @@ export default async function ReservarPage({
               addons={addons ?? []}
               stripePublishableKey={process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''}
               mercadoPagoPublicKey={process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ?? ''}
+              resumeCartId={resumeCart?.id}
+              initialGuestInfo={
+                resumeCart
+                  ? {
+                      name: resumeCart.guest_name ?? '',
+                      email: resumeCart.guest_email ?? '',
+                      phone: resumeCart.guest_phone ?? '',
+                      notes: resumeCart.guest_notes ?? '',
+                    }
+                  : undefined
+              }
             />
           </div>
         )}

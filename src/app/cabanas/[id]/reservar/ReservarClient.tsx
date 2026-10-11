@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { GuestCounts } from '@/lib/occupancy'
@@ -9,6 +9,7 @@ import { createStripePaymentIntent, finalizeStripeBooking, createMercadoPagoPaym
 import StripePaymentForm from './StripePaymentForm'
 import MercadoPagoPaymentForm from './MercadoPagoPaymentForm'
 import { trackMetaEvent } from '@/lib/meta-pixel'
+import { saveCartAction, markCartAction } from './cart-actions'
 
 type Provider = 'stripe' | 'mercadopago'
 
@@ -31,6 +32,8 @@ export default function ReservarClient({
   addons,
   stripePublishableKey,
   mercadoPagoPublicKey,
+  resumeCartId,
+  initialGuestInfo,
 }: {
   propertyId: string
   checkin: string
@@ -40,9 +43,14 @@ export default function ReservarClient({
   addons: AddonOption[]
   stripePublishableKey: string
   mercadoPagoPublicKey: string
+  // Liga de "retomar reserva" de un carrito abandonado (ver src/lib/carts.ts).
+  resumeCartId?: string
+  initialGuestInfo?: GuestInfo
 }) {
   const router = useRouter()
-  const [guestInfo, setGuestInfo] = useState<GuestInfo>({ name: '', email: '', phone: '', notes: '' })
+  const [guestInfo, setGuestInfo] = useState<GuestInfo>(initialGuestInfo ?? { name: '', email: '', phone: '', notes: '' })
+  // Id del carrito de este checkout (para recuperar reservas abandonadas).
+  const [cartId] = useState(() => resumeCartId ?? crypto.randomUUID())
   const [confirmed, setConfirmed] = useState(false)
   const [provider, setProvider] = useState<Provider | null>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -117,8 +125,34 @@ export default function ReservarClient({
 
   const infoComplete = guestInfo.name.trim().length > 1 && /\S+@\S+\.\S+/.test(guestInfo.email) && guestInfo.phone.trim().length >= 8
 
+  // Carrito abandonado: en cuanto los datos están completos se guardan
+  // (con una pausa de 1.5 s para no mandar una petición por cada tecla),
+  // y se vuelven a guardar si cambian fechas, extras o cupón. Si el
+  // huésped no termina de pagar, a los 20 minutos le llega el aviso al
+  // anfitrión y aparece en /admin/carritos.
+  const cartPayload = () => ({
+    cartId,
+    propertyId,
+    checkin,
+    checkout,
+    guests,
+    guestInfo,
+    addonSelections,
+    discountCode: appliedCoupon?.code ?? null,
+    quotedTotal: total,
+  })
+  useEffect(() => {
+    if (!infoComplete) return
+    const t = setTimeout(() => {
+      saveCartAction(cartPayload())
+    }, 1500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [infoComplete, guestInfo, addonSelections, appliedCoupon, total])
+
   async function chooseProvider(next: Provider) {
     trackMetaEvent('AddPaymentInfo', { value: total, currency: 'MXN', content_ids: [propertyId] })
+    markCartAction(cartId, 'pago_iniciado', { provider: next })
     setError(null)
     setProvider(next)
     if (next === 'stripe' && !clientSecret) {
@@ -141,10 +175,12 @@ export default function ReservarClient({
     if ('error' in result) {
       setFinalizing(false)
       setError(result.error ?? 'Ocurrió un error inesperado.')
+      markCartAction(cartId, 'pago_rechazado', { error: result.error ?? undefined })
       return
     }
     // No usar setFinalizing(false) aquí: nos vamos de esta página, así que
     // no hace falta (y evita un parpadeo del botón justo antes de navegar).
+    await markCartAction(cartId, 'reservado', { bookingId: result.bookingId })
     router.push(`/reserva-confirmada?bookingId=${result.bookingId}`)
   }
 
@@ -172,8 +208,10 @@ export default function ReservarClient({
     if ('error' in result) {
       setFinalizing(false)
       setError(result.error ?? 'Ocurrió un error inesperado.')
+      markCartAction(cartId, 'pago_rechazado', { error: result.error ?? undefined })
       return
     }
+    await markCartAction(cartId, 'reservado', { bookingId: result.bookingId })
     router.push(`/reserva-confirmada?bookingId=${result.bookingId}`)
   }
 
@@ -324,6 +362,7 @@ export default function ReservarClient({
           <button
             onClick={() => {
               trackMetaEvent('InitiateCheckout', { value: total, currency: 'MXN', content_ids: [propertyId] })
+              saveCartAction(cartPayload())
               setConfirmed(true)
             }}
             disabled={!infoComplete}
@@ -331,6 +370,9 @@ export default function ReservarClient({
           >
             Continuar al pago
           </button>
+          <p className="text-[11px] text-stone text-center">
+            Guardamos tus datos solo para dar seguimiento a tu reserva.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -366,7 +408,10 @@ export default function ReservarClient({
                 publishableKey={stripePublishableKey}
                 clientSecret={clientSecret}
                 onConfirmed={handleStripeConfirmed}
-                onError={setError}
+                onError={(msg) => {
+                  setError(msg)
+                  markCartAction(cartId, 'pago_rechazado', { provider: 'stripe', error: msg })
+                }}
               />
             </div>
           )}
