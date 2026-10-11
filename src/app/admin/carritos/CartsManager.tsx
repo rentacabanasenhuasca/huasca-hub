@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { setCartAutoEmail, sendCartEmailAction, setCartStatus } from './actions'
+import { setCartAutoEmail, sendCartEmailAction, setCartStatus, importStripeCartsAction } from './actions'
 
 export type CartView = {
   id: string
@@ -175,6 +175,8 @@ export default function CartsManager({
 }) {
   const [auto, setAuto] = useState(autoEmail)
   const [pending, startTransition] = useTransition()
+  const [importing, startImport] = useTransition()
+  const [importMsg, setImportMsg] = useState<string | null>(null)
 
   return (
     <div className="space-y-4">
@@ -208,7 +210,7 @@ export default function CartsManager({
         </button>
       </div>
 
-      <div className="flex gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
         <Link
           href="/admin/carritos"
           className={showAll ? 'text-stone hover:text-navy-deep' : 'font-medium text-navy-deep underline underline-offset-4'}
@@ -221,7 +223,21 @@ export default function CartsManager({
         >
           Todos (últimos 60 días)
         </Link>
+        <button
+          type="button"
+          disabled={importing}
+          onClick={() =>
+            startImport(async () => {
+              const r = await importStripeCartsAction()
+              setImportMsg(r.error ?? `Listo: ${r.imported} pago(s) de Stripe agregados.`)
+            })
+          }
+          className="ml-auto rounded-full border border-stone/25 bg-white px-3 py-1.5 text-xs font-medium text-navy-deep hover:border-gold transition disabled:opacity-40"
+        >
+          {importing ? 'Buscando en Stripe…' : 'Traer pagos incompletos de Stripe (10 días)'}
+        </button>
       </div>
+      {importMsg && <p className="text-xs text-stone">{importMsg}</p>}
 
       {carts.length === 0 ? (
         <p className="rounded-2xl border border-stone/15 bg-white p-6 text-sm text-stone text-center">

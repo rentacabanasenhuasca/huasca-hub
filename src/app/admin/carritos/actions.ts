@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireHost } from '@/lib/hosts'
 import { createServiceClient } from '@/lib/supabase/service'
-import { sendCartGuestEmail } from '@/lib/carts'
+import { sendCartGuestEmail, importStripeCarts } from '@/lib/carts'
 import { isUuid } from '@/lib/is-uuid'
 
 async function ownCart(cartId: string) {
@@ -43,4 +43,15 @@ export async function setCartStatus(cartId: string, status: 'abierto' | 'contact
   if (error) return { error: `No se pudo guardar: ${error.message}` }
   revalidatePath('/admin/carritos')
   return { error: null }
+}
+
+export async function importStripeCartsAction() {
+  const host = await requireHost()
+  try {
+    const r = await importStripeCarts(host.id, 10)
+    revalidatePath('/admin/carritos')
+    return { error: null, imported: r.imported }
+  } catch (err) {
+    return { error: `No se pudo leer Stripe: ${(err as Error).message}`, imported: 0 }
+  }
 }
