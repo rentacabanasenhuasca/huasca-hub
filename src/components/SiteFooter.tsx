@@ -18,6 +18,10 @@ export default function SiteFooter() {
           <Link href="/reglamento" className="hover:text-stone hover:underline underline-offset-2 transition">
             Reglamento
           </Link>
+          <span className="text-stone/30">·</span>
+          <Link href="/extras" className="hover:text-stone hover:underline underline-offset-2 transition">
+            Extras
+          </Link>
         </div>
       </div>
     </footer>
