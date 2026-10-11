@@ -24,6 +24,7 @@ export type CartView = {
   datesFree: boolean
   datesPast: boolean
   whatsappLink: string | null
+  whatsappMessage: string
   resumeUrl: string
   copyText: string
 }
@@ -114,6 +115,7 @@ function CartCard({ cart }: { cart: CartView }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {cart.phone && <CopyButton text={cart.phone} label="Copiar teléfono" />}
         <CopyButton text={cart.copyText} label="Copiar datos" />
+        <CopyButton text={cart.whatsappMessage} label="Copiar mensaje" />
         {cart.whatsappLink && (
           <a
             href={cart.whatsappLink}

@@ -1,6 +1,6 @@
 import { requireHost } from '@/lib/hosts'
 import { createServiceClient } from '@/lib/supabase/service'
-import { cartResumeUrl, cartWhatsAppLink, shortDate, ABANDON_AFTER_MINUTES, type CartRow } from '@/lib/carts'
+import { cartResumeUrl, cartWhatsAppLink, cartWhatsAppMessage, shortDate, ABANDON_AFTER_MINUTES, type CartRow } from '@/lib/carts'
 import { todayInMexicoStr } from '@/lib/dates'
 import CartsManager, { type CartView } from './CartsManager'
 
@@ -103,6 +103,7 @@ export default async function CarritosPage({ searchParams }: { searchParams: Pro
         datesFree: free,
         datesPast: c.check_in < today,
         whatsappLink: cartWhatsAppLink(c, property),
+        whatsappMessage: cartWhatsAppMessage(c, property),
         resumeUrl,
         copyText,
       },
