@@ -34,7 +34,7 @@ const BRAND = {
 // adjunto inline (cid) en vez de una URL remota, para que se vea siempre
 // (Gmail y otros bloquean imágenes remotas por defecto, y el sitio aún no
 // está en línea en huascaretreats.com).
-function wrapBrandedEmail(bodyHtml: string): string {
+export function wrapBrandedEmail(bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html lang="es">
   <head>
