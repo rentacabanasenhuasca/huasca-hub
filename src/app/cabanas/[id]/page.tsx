@@ -14,6 +14,8 @@ import TrackedBookLink from '@/components/TrackedBookLink'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
+import { Suspense } from 'react'
+import CabinAvailabilityCalendar from '@/components/CabinAvailabilityCalendar'
 
 function waLink(phone: string, text: string) {
   const digits = phone.replace(/[^\d]/g, '')
@@ -171,6 +173,20 @@ export default async function CabanaPage({
 
   const fitsGuests = fitsProperty(property, guests)
 
+  // Noches ocupadas de los próximos 12 meses, para el calendario de la cabaña.
+  const availabilityStart = todayInMexicoStr()
+  const availabilityEnd = (() => {
+    const d = new Date(`${availabilityStart}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + 365)
+    return d.toISOString().slice(0, 10)
+  })()
+  const { data: availabilityBlocked } = await supabase
+    .from('blocked_dates')
+    .select('date')
+    .eq('property_id', property.id)
+    .gte('date', availabilityStart)
+    .lte('date', availabilityEnd)
+
   const amenityGroups = new Map<string, string[]>()
   for (const pa of (propertyAmenities ?? []) as unknown as {
     description: string | null
@@ -274,6 +290,21 @@ export default async function CabanaPage({
                 </div>
               </div>
             )}
+
+            <div id="disponibilidad" className="mt-8 pt-8 border-t border-stone/10 scroll-mt-40">
+              <h2 className="font-display text-xl text-navy-deep mb-4">Disponibilidad</h2>
+              <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
+                <Suspense fallback={null}>
+                  <CabinAvailabilityCalendar
+                    blockedDates={(availabilityBlocked ?? []).map((b) => b.date)}
+                    today={availabilityStart}
+                    windowEnd={availabilityEnd}
+                    checkin={hasSearch ? checkin : undefined}
+                    checkout={hasSearch ? checkout : undefined}
+                  />
+                </Suspense>
+              </div>
+            </div>
 
             <div className="mt-8 pt-8 border-t border-stone/10 text-sm text-stone space-y-1.5">
               <p>Estancia mínima: {property.min_nights} noche(s){property.max_nights ? ` · máxima ${property.max_nights}` : ''}</p>
