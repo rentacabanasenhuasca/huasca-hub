@@ -46,4 +46,11 @@ export async function register() {
   // minutos para la primera pasada), y luego cada SYNC_INTERVAL_MS.
   runSync()
   setInterval(runSync, SYNC_INTERVAL_MS)
+
+  // Carritos abandonados: cada 5 minutos revisa quién lleva 20+ minutos
+  // sin terminar de pagar y avisa por correo (ver src/lib/carts.ts).
+  const { processAbandonedCarts } = await import('@/lib/carts')
+  setInterval(() => {
+    processAbandonedCarts().catch((err) => console.warn('[carritos]', (err as Error).message))
+  }, 5 * 60 * 1000)
 }
