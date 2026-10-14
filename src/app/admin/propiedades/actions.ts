@@ -65,6 +65,7 @@ function buildPropertyPayload(formData: FormData) {
     status: (formData.get('status') === 'published' ? 'published' : 'draft') as
       | 'draft'
       | 'published',
+    booking_mode: (formData.get('booking_mode') === 'whatsapp' ? 'whatsapp' : 'online') as 'online' | 'whatsapp',
 
     min_nights: num(formData, 'min_nights') ?? 1,
     min_nights_by_day: parseMinNightsByDay(formData),

@@ -28,6 +28,7 @@ export type PropertyRecord = {
   show_exact_location: boolean
   pet_friendly: boolean
   status: 'draft' | 'published'
+  booking_mode?: 'online' | 'whatsapp' | null
   min_nights: number
   min_nights_by_day: Record<string, number> | null
   max_nights: number | null
@@ -476,6 +477,13 @@ export default function PropertyForm({
             <select name="status" defaultValue={property?.status ?? 'draft'} className={inputClass}>
               <option value="draft">Borrador (no visible al público)</option>
               <option value="published">Publicada</option>
+            </select>
+          </label>
+          <label className="sm:col-span-2">
+            <span className={labelClass}>Cómo se reserva</span>
+            <select name="booking_mode" defaultValue={property?.booking_mode ?? 'online'} className={inputClass}>
+              <option value="online">En línea (calendario, precio y pago en el sitio)</option>
+              <option value="whatsapp">Solo por WhatsApp (se anuncia, pero preguntan disponibilidad por WhatsApp)</option>
             </select>
           </label>
         </div>
