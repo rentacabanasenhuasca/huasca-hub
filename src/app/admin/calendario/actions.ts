@@ -92,7 +92,7 @@ export async function loadCalendarWindow(propertyIds: string[], startDate: strin
       .lte('date', endDate),
     supabase
       .from('blocked_dates')
-      .select('property_id, date, source, note, booking_id, external_summary, ical_sources(platform, label)')
+      .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
       .in('property_id', propertyIds)
       .gte('date', startDate)
       .lte('date', endDate),
@@ -302,7 +302,7 @@ export async function setManualBlock(selections: Selection[], blocked: boolean, 
   const byProperty = groupByProperty(selections)
 
   if (blocked) {
-    const propertyIds = [...byProperty.keys()]; const dates = selections.map((s) => s.date); const { data: existing } = await supabase.from('blocked_dates').select('property_id, date, source').in('property_id', propertyIds).in('date', dates); const nonManualKeys = new Set((existing ?? []).filter((r) => r.source !== 'manual').map((r) => `${r.property_id}|${r.date}`)); const trimmedNote = note?.trim() || null; const rows = selections.filter((s) => !nonManualKeys.has(`${s.propertyId}|${s.date}`)).map((s) => ({ property_id: s.propertyId, date: s.date, source: 'manual' as const, note: trimmedNote }))
+    const propertyIds = [...byProperty.keys()]; const dates = selections.map((s) => s.date); const { data: existing } = await supabase.from('blocked_dates').select('property_id, date, source').in('property_id', propertyIds).in('date', dates); const nonManualKeys = new Set((existing ?? []).filter((r) => r.source !== 'manual').map((r) => `${r.property_id}|${r.date}`)); const trimmedNote = note?.trim() || null; const rows = selections.filter((s) => !nonManualKeys.has(`${s.propertyId}|${s.date}`)).map((s) => ({ property_id: s.propertyId, date: s.date, source: 'manual' as const, note: trimmedNote, blocked_by: null }))
     const { error } = await supabase
       .from('blocked_dates')
       .upsert(rows, { onConflict: 'property_id,date' })
@@ -321,7 +321,7 @@ export async function setManualBlock(selections: Selection[], blocked: boolean, 
     [...byProperty.entries()].map(([propertyId, dates]) =>
       supabase
         .from('blocked_dates')
-        .select('property_id, date, source, note, booking_id, external_summary, ical_sources(platform, label)')
+        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
         .eq('property_id', propertyId)
         .in('date', dates)
     )

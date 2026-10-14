@@ -45,6 +45,7 @@ type BlockedDate = {
   date: string
   source: string
   note: string | null
+  blocked_by?: string | null
   booking_id: string | null
   external_summary: string | null
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
@@ -108,7 +109,7 @@ function blockedLabel(b: BlockedDate): string {
     return `Bloqueado — ${icalSource?.label ?? (kind === 'airbnb' ? 'Airbnb' : 'Booking.com')}${b.external_summary ? ` (${b.external_summary})` : ''}`
   }
   if (kind === 'direct') return 'Bloqueado — reserva directa en este sitio'
-  if (kind === 'manual') return `Bloqueado manualmente${b.note ? ` — ${b.note}` : ''}`
+  if (kind === 'manual') return `${b.blocked_by ? `Bloqueado por ${b.blocked_by}` : 'Bloqueado manualmente'}${b.note ? ` — ${b.note}` : ''}`
   return `Bloqueado — ${icalSource?.label ?? 'calendario externo'}${b.external_summary ? ` (${b.external_summary})` : ''}`
 }
 
@@ -1041,6 +1042,11 @@ export default function CalendarGrid({
                         <span className={blocked ? 'text-stone line-through' : 'text-navy-deep'}>
                           {cd ? Math.round(Number(cd.price_mxn)).toLocaleString('es-MX') : '—'}
                         </span>
+                        {kind === 'manual' && blocked?.blocked_by && (
+                          <span className="max-w-[64px] truncate rounded bg-burnt-orange/15 px-1 text-[9px] font-medium leading-tight text-burnt-orange">
+                            {blocked.blocked_by.split(' ')[0]}
+                          </span>
+                        )}
                       </div>
                       {blocked && (
                         <button
@@ -1389,7 +1395,15 @@ export default function CalendarGrid({
                 </div>
               ) : kind === 'manual' ? (
                 <div className="text-sm space-y-2">
-                  <p className="text-stone">Bloqueaste esta fecha manualmente desde el calendario.</p>
+                  <p className="text-stone">
+                    {blocked?.blocked_by ? (
+                      <>
+                        Lo bloqueó <span className="font-medium text-navy-deep">{blocked.blocked_by}</span> (colaborador) desde su panel.
+                      </>
+                    ) : (
+                      'Bloqueaste esta fecha manualmente desde el calendario.'
+                    )}
+                  </p>
                   {blocked?.note && (
                     <div>
                       <dt className="text-xs text-stone">Nota</dt>
