@@ -156,7 +156,7 @@ export default function StaffCalendar({
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Nota opcional (ej. mantenimiento, uso personal)"
+              placeholder="Nota para el anfitrión (ej. mantenimiento, uso personal, llega familia)"
               maxLength={120}
               className="w-full rounded-lg border border-stone/25 bg-white px-3 py-2 text-sm text-navy-deep focus:border-gold focus:outline-none"
             />

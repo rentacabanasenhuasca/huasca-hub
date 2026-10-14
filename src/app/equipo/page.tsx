@@ -41,7 +41,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const [{ data: blocked }, { data: bookings }] = await Promise.all([
     service
       .from('blocked_dates')
-      .select('date, source, note, booking_id, ical_sources(platform, label)')
+      .select('date, source, note, blocked_by, booking_id, ical_sources(platform, label)')
       .eq('property_id', property.id)
       .gte('date', today)
       .lt('date', until),
@@ -74,7 +74,11 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const days: Record<string, DayInfo> = {}
   for (const row of blocked ?? []) {
     const src = Array.isArray(row.ical_sources) ? row.ical_sources[0] : row.ical_sources
-    if (row.source === 'manual') days[row.date] = { kind: 'manual', label: row.note ?? 'Bloqueado' }
+    if (row.source === 'manual')
+      days[row.date] = {
+        kind: 'manual',
+        label: `Bloqueado${row.blocked_by ? ` por ${row.blocked_by}` : ' por el anfitrión'}${row.note ? ` — ${row.note}` : ''}`,
+      }
     else if (row.source === 'booking') days[row.date] = { kind: 'booking', label: 'Reservado' }
     else days[row.date] = { kind: 'external', label: `Ocupado en ${src?.label ?? src?.platform ?? 'otra plataforma'}` }
   }

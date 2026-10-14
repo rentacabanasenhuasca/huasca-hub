@@ -33,10 +33,10 @@ export async function staffSetBlock(
       .eq('property_id', propertyId)
       .in('date', clean)
     const taken = new Set((existing ?? []).filter((r) => r.source !== 'manual').map((r) => r.date))
-    const text = note?.trim() ? `${note.trim()} — por ${staff.name}` : `Bloqueado por ${staff.name}`
+    const text = note?.trim() || null
     const rows = clean
       .filter((d) => !taken.has(d))
-      .map((date) => ({ property_id: propertyId, date, source: 'manual' as const, note: text }))
+      .map((date) => ({ property_id: propertyId, date, source: 'manual' as const, note: text, blocked_by: staff.name }))
     if (rows.length === 0) return { error: 'Esas fechas ya están ocupadas por una reserva o por otra plataforma.' }
     const { error } = await service.from('blocked_dates').upsert(rows, { onConflict: 'property_id,date' })
     if (error) return { error: `No se pudo bloquear: ${error.message}` }
