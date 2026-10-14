@@ -114,7 +114,7 @@ export default async function CabanaPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children'
+      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode'
     )
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
@@ -155,6 +155,9 @@ export default async function CabanaPage({
   const guests = parseGuestsFromParams(sp)
   if (!sp.adults && !sp.guests) guests.adults = property.base_occupancy || guests.adults
   const hasSearch = Boolean(checkin && checkout && checkout > checkin)
+  // "Solo por WhatsApp": se anuncia pero no se cotiza ni se paga en línea;
+  // el huésped pregunta disponibilidad por WhatsApp.
+  const whatsappOnly = property.booking_mode === 'whatsapp'
 
   let total: number | null = null
   let nights: string[] = []
@@ -162,7 +165,7 @@ export default async function CabanaPage({
   let isFree = true
   let minNightsOk = true
 
-  if (hasSearch) {
+  if (hasSearch && !whatsappOnly) {
     const quote = await getBookingQuote(supabase, property, checkin!, checkout!, guests)
     nights = quote.nights
     total = quote.total
@@ -198,9 +201,13 @@ export default async function CabanaPage({
     amenityGroups.set(pa.amenities.category, list)
   }
 
-  const waText = `Hola, me interesa reservar ${property.name}${
-    hasSearch ? ` del ${checkin} al ${checkout} para ${guestsSummary(guests)}` : ''
-  }.`
+  const waText = whatsappOnly
+    ? `Hola, quiero saber si ${property.name} está disponible${
+        hasSearch ? ` del ${checkin} al ${checkout} para ${guestsSummary(guests)}` : ''
+      }.`
+    : `Hola, me interesa reservar ${property.name}${
+        hasSearch ? ` del ${checkin} al ${checkout} para ${guestsSummary(guests)}` : ''
+      }.`
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -291,6 +298,7 @@ export default async function CabanaPage({
               </div>
             )}
 
+            {!whatsappOnly && (
             <div id="disponibilidad" className="mt-8 pt-8 border-t border-stone/10 scroll-mt-40">
               <h2 className="font-display text-xl text-navy-deep mb-4">Disponibilidad</h2>
               <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
@@ -305,6 +313,7 @@ export default async function CabanaPage({
                 </Suspense>
               </div>
             </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-stone/10 text-sm text-stone space-y-1.5">
               <p>Estancia mínima: {property.min_nights} noche(s){property.max_nights ? ` · máxima ${property.max_nights}` : ''}</p>
@@ -328,6 +337,16 @@ export default async function CabanaPage({
           </div>
 
           <div className="rounded-3xl border border-stone/10 bg-white p-5 sm:p-6 h-fit lg:sticky lg:top-20 shadow-sm">
+            {whatsappOnly && (
+              <div className="mb-4">
+                <p className="text-navy-deep">
+                  <span className="text-sm text-stone">Desde </span>
+                  <span className="text-xl font-semibold">${Math.round(Number(property.weekday_price_mxn)).toLocaleString('es-MX')}</span>
+                  <span className="text-sm text-stone"> MXN por noche</span>
+                </p>
+                <p className="text-xs text-stone mt-1">Esta cabaña se reserva directo por WhatsApp: pon tus fechas y pregúntanos por disponibilidad.</p>
+              </div>
+            )}
             <form method="get" className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <label>
@@ -370,11 +389,11 @@ export default async function CabanaPage({
                     : 'w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition'
                 }
               >
-                {hasSearch ? 'Actualizar fechas' : 'Ver precio'}
+                {hasSearch ? 'Actualizar fechas' : whatsappOnly ? 'Agregar fechas al mensaje' : 'Ver precio'}
               </button>
             </form>
 
-            {hasSearch && (
+            {hasSearch && !whatsappOnly && (
               <div className="mt-5 pt-5 border-t border-stone/10 text-sm">
                 {!isFree ? (
                   <p className="text-burnt-orange">
@@ -417,9 +436,13 @@ export default async function CabanaPage({
                 <a
                   href={waLink(host.phone, waText)}
                   target="_blank" rel="noopener noreferrer"
-                  className="block text-center w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition"
+                  className={
+                    whatsappOnly
+                      ? 'block text-center w-full rounded-full bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition'
+                      : 'block text-center w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition'
+                  }
                 >
-                  Preguntar / reservar por WhatsApp
+                  {whatsappOnly ? 'Consultar disponibilidad por WhatsApp' : 'Preguntar / reservar por WhatsApp'}
                 </a>
               ) : host?.email ? (
                 <a
@@ -429,9 +452,11 @@ export default async function CabanaPage({
                   Preguntar / reservar por correo
                 </a>
               ) : null}
-              <p className="text-xs text-stone text-center mt-2.5">
-                Por ahora las reservas se confirman directo contigo. El pago en línea llega pronto.
-              </p>
+              {!whatsappOnly && (
+                <p className="text-xs text-stone text-center mt-2.5">
+                  Por ahora las reservas se confirman directo contigo. El pago en línea llega pronto.
+                </p>
+              )}
             </div>
           </div>
         </div>
