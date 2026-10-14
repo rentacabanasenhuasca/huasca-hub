@@ -65,7 +65,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
             adults: number
             children: number
             infants: number
-            pets: number
+            pets: boolean
             source: string
           }[],
         }),
@@ -123,7 +123,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
           ) : (
             <ul className="divide-y divide-stone/10">
               {(bookings ?? []).map((b) => {
-                const guests = `${b.adults} adultos${b.children ? `, ${b.children} niños` : ''}${b.infants ? `, ${b.infants} bebés` : ''}${b.pets ? `, ${b.pets} mascota(s)` : ''}`
+                const guests = `${b.adults} adultos${b.children ? `, ${b.children} niños` : ''}${b.infants ? `, ${b.infants} bebés` : ''}${b.pets ? ', con mascota' : ''}`
                 return (
                   <li key={b.id} className="py-2.5 text-sm">
                     <p className="text-navy-deep font-medium">
