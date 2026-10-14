@@ -30,13 +30,15 @@ export default async function ReservarPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, capacity, base_occupancy, max_children, max_infants, infants_count_toward_capacity, pet_friendly, weekday_price_mxn, weekend_price_mxn, extra_guest_fee_mxn, min_nights'
+      'id, host_id, name, slug, capacity, base_occupancy, max_children, max_infants, infants_count_toward_capacity, pet_friendly, weekday_price_mxn, weekend_price_mxn, extra_guest_fee_mxn, min_nights, booking_mode'
     )
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
     .maybeSingle()
 
   if (!property) notFound()
+  // Las cabañas "solo por WhatsApp" no se reservan en línea.
+  if (property.booking_mode === 'whatsapp') redirect(`/cabanas/${property.slug}`)
   if (property.slug !== id) {
     const qs = new URLSearchParams(
       Object.entries(sp).filter(([, v]) => v != null) as [string, string][]

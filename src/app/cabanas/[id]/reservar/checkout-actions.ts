@@ -25,6 +25,7 @@ async function loadProperty(propertyId: string): Promise<PropertyWithHost> {
     )
     .eq('id', propertyId)
     .eq('status', 'published')
+    .neq('booking_mode', 'whatsapp')
     .maybeSingle()
   if (!property) throw new Error('Cabaña no encontrada.')
   return property as PropertyWithHost
