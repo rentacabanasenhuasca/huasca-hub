@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { findStaffByUserId } from '@/lib/staff'
 
 /**
  * Devuelve la fila de `hosts` del usuario autenticado, creándola si es la
@@ -27,6 +28,10 @@ export async function requireHost() {
   if (existing) {
     return existing
   }
+
+  // Un colaborador (ver src/lib/staff.ts) no es anfitrión: no se le crea
+  // un perfil de anfitrión, su panel es /equipo.
+  if (await findStaffByUserId(user.id)) redirect('/equipo')
 
   const name = (user.user_metadata?.name as string | undefined) || user.email || 'Anfitrión'
 
