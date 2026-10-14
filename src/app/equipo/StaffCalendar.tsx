@@ -4,6 +4,9 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { staffSetBlock } from './actions'
 
+// Cuántos meses se muestran a la vez (todo el horizonte cargado: ~13 meses).
+const MONTHS_SHOWN = 13
+
 export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string }
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
@@ -48,13 +51,12 @@ export default function StaffCalendar({
   canBlock: boolean
 }) {
   const router = useRouter()
-  const [offset, setOffset] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const months = useMemo(() => [monthStart(today, offset), monthStart(today, offset + 1)], [today, offset])
+  const months = useMemo(() => Array.from({ length: MONTHS_SHOWN }, (_, i) => monthStart(today, i)), [today])
 
   const selectedList = [...selected].sort()
   const selectedFree = selectedList.filter((d) => !days[d])
@@ -90,28 +92,7 @@ export default function StaffCalendar({
 
   return (
     <div className="rounded-2xl border border-stone/15 bg-white p-4 sm:p-5">
-      <div className="flex items-center justify-between mb-3">
-        <button
-          type="button"
-          onClick={() => setOffset((o) => Math.max(0, o - 1))}
-          disabled={offset === 0}
-          className="rounded-full border border-stone/25 px-3 py-1 text-sm text-navy-deep disabled:opacity-30"
-          aria-label="Mes anterior"
-        >
-          ←
-        </button>
-        <button
-          type="button"
-          onClick={() => setOffset((o) => Math.min(11, o + 1))}
-          disabled={offset >= 11}
-          className="rounded-full border border-stone/25 px-3 py-1 text-sm text-navy-deep disabled:opacity-30"
-          aria-label="Mes siguiente"
-        >
-          →
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
         {months.map((m) => (
           <div key={iso(m)}>
             <p className="text-center font-medium text-navy-deep capitalize mb-2">
@@ -164,7 +145,7 @@ export default function StaffCalendar({
       </div>
 
       {canBlock && selected.size > 0 && (
-        <div className="mt-4 rounded-xl bg-cream p-3 space-y-3">
+        <div className="sticky bottom-3 z-10 mt-4 rounded-xl border border-gold/40 bg-cream p-3 space-y-3 shadow-lg">
           <p className="text-sm text-navy-deep">
             {selected.size} día(s) seleccionado(s)
             {selectedManual.length > 0 && selectedFree.length > 0
