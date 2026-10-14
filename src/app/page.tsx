@@ -66,12 +66,12 @@ export default async function Home({
   const { data: properties } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity'
+      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode'
     )
     .eq('status', 'published')
     .order('name')
 
-  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string })[]
+  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null })[]
   const propertyIds = typedProperties.map((p) => p.id)
   // El anfitrión "real": el dueño de las propiedades publicadas. Sirve para
   // filtrar la portada (hero_media) — si por alguna razón llegara a existir
@@ -177,7 +177,9 @@ export default async function Home({
   const results = typedProperties
     .map((property) => {
       const fitsGuests = fitsProperty(property, guests)
-      if (!hasSearch) {
+      // Las cabañas "solo por WhatsApp" no muestran precio total ni se filtran
+      // por disponibilidad: el huésped pregunta por WhatsApp.
+      if (!hasSearch || property.booking_mode === 'whatsapp') {
         return { property, total: null as number | null, minNightsOk: true, minNightsRequired: 1, fitsGuests, isFree: true }
       }
 
@@ -400,6 +402,9 @@ export default async function Home({
                             </>
                           )}
                         </p>
+                        {property.booking_mode === 'whatsapp' && (
+                          <p className="text-xs text-[#128C7E] mt-1.5 font-medium">Consulta disponibilidad por WhatsApp</p>
+                        )}
                       </div>
                     </Link>
                   )
@@ -419,7 +424,7 @@ export default async function Home({
             <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-5">Calendario de disponibilidad</h2>
             <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
               <PublicAvailabilityGrid
-                properties={typedProperties.map((p) => ({
+                properties={typedProperties.filter((p) => p.booking_mode !== 'whatsapp').map((p) => ({
                   id: p.id,
                   slug: p.slug,
                   name: p.name,
