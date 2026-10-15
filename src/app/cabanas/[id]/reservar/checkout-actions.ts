@@ -248,20 +248,29 @@ async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
 
   // Mercado Pago no deja crear dos customers con el mismo email — si el
   // huésped ya reservó antes, reusamos su customer existente.
-  let customerId: string
-  const existing = await customerClient.search({ options: { email: params.guestInfo.email } })
-  const found = existing.results?.[0]
-  if (found?.id) {
-    customerId = found.id
-  } else {
-    const created = await customerClient.create({
-      body: {
-        email: params.guestInfo.email,
-        first_name: params.guestInfo.name,
-      },
-    })
-    if (!created.id) return { error: 'No se pudo crear el cliente en Mercado Pago.' }
-    customerId = created.id
+  //
+  // El customer solo sirve para guardar la tarjeta (depósitos por daños). Si
+  // la cuenta/aplicación de Mercado Pago no tiene permiso para la API de
+  // clientes ("At least one policy returned UNAUTHORIZED"), NO bloqueamos la
+  // reserva: cobramos sin customer y simplemente no se guarda la tarjeta.
+  let customerId: string | null = null
+  try {
+    const existing = await customerClient.search({ options: { email: params.guestInfo.email } })
+    const found = existing.results?.[0]
+    if (found?.id) {
+      customerId = found.id
+    } else {
+      const created = await customerClient.create({
+        body: {
+          email: params.guestInfo.email,
+          first_name: params.guestInfo.name,
+        },
+      })
+      customerId = created.id ?? null
+    }
+  } catch (err) {
+    console.error('[mercadopago] no se pudo buscar/crear el customer, se cobra sin él:', err)
+    customerId = null
   }
 
   const payment = await paymentClient.create({
@@ -273,11 +282,9 @@ async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
       payment_method_id: params.paymentMethodId,
       issuer_id: params.issuerId ? Number(params.issuerId) : undefined,
       capture: true,
-      payer: {
-        type: 'customer',
-        id: customerId,
-        email: params.guestInfo.email,
-      },
+      payer: customerId
+        ? { type: 'customer', id: customerId, email: params.guestInfo.email }
+        : { email: params.guestInfo.email },
     },
   })
 
@@ -294,8 +301,10 @@ async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
   // después, sin pedirle la tarjeta de nuevo.
   let cardId: string | null = null
   try {
-    const savedCard = await cardClient.create({ customerId, body: { token: params.token } })
-    cardId = savedCard.id ?? null
+    if (customerId) {
+      const savedCard = await cardClient.create({ customerId, body: { token: params.token } })
+      cardId = savedCard.id ?? null
+    }
   } catch {
     // Si falla el guardado de la tarjeta no cancelamos la reserva — el pago
     // ya se cobró correctamente, solo no habrá tarjeta guardada para
