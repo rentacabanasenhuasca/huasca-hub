@@ -50,7 +50,7 @@ async function loadExtras() {
 export async function generateMetadata(): Promise<Metadata> {
   const { extras } = await loadExtras()
   const cover = extras.find((e) => e.photo_url)?.photo_url
-  const title = 'Extras para tu estancia — Huasca Retreats'
+  const title = 'Extras para tu estancia en Huasca de Ocampo: masajes, decoración y más'
   const description = `Haz tu escapada a Huasca de Ocampo más especial: ${extras
     .map((e) => e.name.toLowerCase())
     .slice(0, 5)
