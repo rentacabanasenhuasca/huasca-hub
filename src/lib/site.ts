@@ -7,7 +7,7 @@
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://huascaretreats.com').replace(/\/$/, '')
 export const SITE_NAME = 'Huasca Retreats'
 export const SITE_DESCRIPTION =
-  'Cabañas y espacios de descanso exclusivos en Huasca de Ocampo, Hidalgo — renta directa, sin intermediarios. Reserva en línea con disponibilidad y precios en tiempo real.'
+  'Renta de cabañas en Huasca de Ocampo, Hidalgo: jacuzzi, chimenea, techo de cristal y pet friendly, a 2 horas de la CDMX. Reserva directo, sin comisiones.'
 
 // Palabras clave núcleo del negocio, resultado de cruzar cómo la gente
 // busca hospedaje en Huasca de Ocampo (renta de cabañas, jacuzzi, pet
@@ -25,4 +25,10 @@ export const CORE_KEYWORDS = [
   'cabañas cerca de Prismas Basálticos',
   'Huasca de Ocampo pueblo mágico hospedaje',
   'renta directa de cabañas sin intermediarios',
+  'cabañas románticas Huasca de Ocampo',
+  'cabañas con chimenea Huasca',
+  'glamping Huasca de Ocampo',
+  'cabañas con techo de cristal',
+  'cabañas cerca de CDMX',
+  'qué hacer en Huasca de Ocampo',
 ]
