@@ -6,10 +6,11 @@
 // había forma de ver el resto.
 import { useEffect, useState } from 'react'
 import { optimizedImage } from '@/lib/media'
+import ForSaleBadge from '@/components/ForSaleBadge'
 
 type Photo = { url: string; category: string | null; description: string | null }
 
-export default function PhotoGallery({ photos, alt }: { photos: Photo[]; alt: string }) {
+export default function PhotoGallery({ photos, alt, forSale = false }: { photos: Photo[]; alt: string; forSale?: boolean }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export default function PhotoGallery({ photos, alt }: { photos: Photo[]; alt: st
             />
           ))}
         </div>
+        {forSale && <ForSaleBadge className="top-3 left-3 sm:top-5 sm:left-5 w-16 sm:w-20" />}
         {photos.length > 1 && (
           <button
             type="button"

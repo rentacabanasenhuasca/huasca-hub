@@ -6,6 +6,7 @@ import { SITE_URL, SITE_NAME } from '@/lib/site'
 import { optimizedImage } from '@/lib/media'
 import { GENERAL_FAQS, LANDINGS, getLanding, type LandingProperty } from '@/lib/seo-landings'
 import SiteFooter from '@/components/SiteFooter'
+import ForSaleBadge from '@/components/ForSaleBadge'
 
 // Página de aterrizaje SEO (ver src/lib/seo-landings.ts). Server component:
 // las cabañas se leen en cada visita, así que una propiedad nueva aparece
@@ -17,6 +18,7 @@ type CardProperty = LandingProperty & {
   bedrooms: number
   weekday_price_mxn: number
   booking_mode: string | null
+  for_sale: boolean | null
   cover: string | null
 }
 
@@ -24,7 +26,7 @@ async function loadProperties(): Promise<CardProperty[]> {
   const supabase = createServiceClient()
   const { data: properties } = await supabase
     .from('properties')
-    .select('id, slug, name, description, capacity, bedrooms, pet_friendly, weekday_price_mxn, booking_mode')
+    .select('id, slug, name, description, capacity, bedrooms, pet_friendly, weekday_price_mxn, booking_mode, for_sale')
     .eq('status', 'published')
     .order('name')
   const ids = (properties ?? []).map((p) => p.id)
@@ -161,7 +163,7 @@ export default async function LandingPage({ slug }: { slug: string }) {
               <Link
                 key={p.id}
                 href={`/cabanas/${p.slug}`}
-                className="group block rounded-3xl border border-stone/10 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-deep/10"
+                className="group relative block rounded-3xl border border-stone/10 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-deep/10"
               >
                 {p.cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -174,6 +176,7 @@ export default async function LandingPage({ slug }: { slug: string }) {
                 ) : (
                   <div className="h-52 w-full bg-cream" />
                 )}
+                {p.for_sale && <ForSaleBadge className="top-3 left-3 w-16" />}
                 <div className="p-5">
                   <h3 className="font-display text-xl text-navy-deep">{p.name}</h3>
                   <p className="text-sm text-stone mt-1.5">
