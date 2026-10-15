@@ -458,7 +458,7 @@ export default async function Home({
           <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-4">
             Hospedaje en Huasca de Ocampo, a 2 horas de la CDMX
           </h2>
-          <div className="space-y-4 text-stone leading-relaxed max-w-3xl">
+          <div className="space-y-4 text-stone leading-relaxed text-justify hyphens-auto">
             <p>
               Huasca Retreats es renta directa de cabañas en Huasca de Ocampo, Hidalgo, el primer Pueblo Mágico de
               México. Nuestras cabañas están en el bosque, con privacidad, fogata y asador; algunas tienen jacuzzi
