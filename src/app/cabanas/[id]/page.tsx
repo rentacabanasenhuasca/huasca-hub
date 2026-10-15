@@ -137,7 +137,7 @@ export default async function CabanaPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode'
+      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale'
     )
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
@@ -162,17 +162,25 @@ export default async function CabanaPage({
       .eq('property_id', property.id),
     supabase
       .from('property_beds')
-      .select('room_type, bed_type, quantity')
+      .select('room_type, room_number, bed_type, quantity')
       .eq('property_id', property.id)
       .order('sort_order', { ascending: true }),
     supabase.from('hosts').select('name, phone, email').eq('id', property.host_id).maybeSingle(),
   ])
 
+  // Camas agrupadas por espacio: "Recámara 1: 1 cama king, 1 cama individual".
+  // Si solo hay una recámara se muestra como "Recámara" a secas.
+  const bedRows = (propertyBeds ?? []) as { room_type: string; room_number: number | null; bed_type: string; quantity: number }[]
+  const roomNumbers = new Set(bedRows.filter((b) => b.room_type === 'recamara').map((b) => b.room_number ?? 0))
   const bedsByRoom = new Map<string, string[]>()
-  for (const b of (propertyBeds ?? []) as { room_type: string; bed_type: string; quantity: number }[]) {
-    const list = bedsByRoom.get(b.room_type) ?? []
+  for (const b of bedRows) {
+    const key =
+      b.room_type === 'recamara' && b.room_number && roomNumbers.size > 1
+        ? `Recámara ${b.room_number}`
+        : (ROOM_TYPE_LABELS[b.room_type] ?? b.room_type)
+    const list = bedsByRoom.get(key) ?? []
     list.push(bedLabel(b.bed_type, b.quantity))
-    bedsByRoom.set(b.room_type, list)
+    bedsByRoom.set(key, list)
   }
 
   const guests = parseGuestsFromParams(sp)
@@ -299,7 +307,11 @@ export default async function CabanaPage({
 
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-6 sm:pt-10 sm:pb-8">
         <TrackViewContent id={property.id} name={property.name} price={property.weekday_price_mxn} />
-        <PhotoGallery photos={photos ?? []} alt={`${property.name}, cabaña en Huasca de Ocampo`} />
+        <PhotoGallery
+          photos={photos ?? []}
+          alt={`${property.name}, cabaña en Huasca de Ocampo`}
+          forSale={Boolean(property.for_sale)}
+        />
 
         <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10">
           <div>
@@ -311,9 +323,9 @@ export default async function CabanaPage({
 
             {bedsByRoom.size > 0 && (
               <div className="mt-2 text-sm text-stone space-y-0.5">
-                {[...bedsByRoom.entries()].map(([roomType, list]) => (
-                  <p key={roomType}>
-                    {ROOM_TYPE_LABELS[roomType] ?? roomType}: {list.join(', ')}
+                {[...bedsByRoom.entries()].map(([room, list]) => (
+                  <p key={room}>
+                    {room}: {list.join(', ')}
                   </p>
                 ))}
               </div>
