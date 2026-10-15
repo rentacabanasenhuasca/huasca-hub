@@ -5,6 +5,10 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
+// Siempre se genera al momento: Airbnb/Booking deben ver los bloqueos y
+// reservas nuevas en cuanto vuelven a leer el calendario, sin caché de por medio.
+export const dynamic = 'force-dynamic'
+
 function toIcsDate(dateStr: string) {
   return dateStr.replace(/-/g, '')
 }
@@ -49,6 +53,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
   }
   const bookings = (bookingsRaw ?? []).filter((b) => blockedBookingIds.has(b.id))
 
+  // DTSTAMP es obligatorio en cada evento según el estándar iCal; sin él
+  // algunas plataformas tratan el calendario como inválido o sin cambios.
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -60,6 +68,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     lines.push(
       'BEGIN:VEVENT',
       `UID:${b.id}@huasca-hub`,
+      `DTSTAMP:${dtstamp}`,
       `DTSTART;VALUE=DATE:${toIcsDate(b.check_in)}`,
       `DTEND;VALUE=DATE:${toIcsDate(b.check_out)}`,
       `SUMMARY:Reservado — ${property.name}`,
@@ -92,6 +101,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     lines.push(
       'BEGIN:VEVENT',
       `UID:manual-${rangeStart}-${propertyId}@huasca-hub`,
+      `DTSTAMP:${dtstamp}`,
       `DTSTART;VALUE=DATE:${toIcsDate(rangeStart)}`,
       `DTEND;VALUE=DATE:${toIcsDate(rangeEnd)}`,
       `SUMMARY:No disponible — ${property.name}`,
@@ -115,7 +125,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
       'Content-Disposition': `inline; filename="${propertyId}.ics"`,
-      'Cache-Control': 'public, max-age=1800',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     },
   })
 }
