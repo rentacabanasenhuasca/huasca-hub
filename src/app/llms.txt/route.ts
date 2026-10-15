@@ -5,6 +5,7 @@
 // de cabañas nunca quede desactualizada.
 import { createServiceClient } from '@/lib/supabase/service'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
+import { LANDINGS } from '@/lib/seo-landings'
 
 export async function GET() {
   const supabase = createServiceClient()
@@ -35,6 +36,8 @@ export async function GET() {
   lines.push('')
   lines.push(`- [Inicio y buscador de disponibilidad](${SITE_URL}/)`)
   lines.push(`- [Políticas de reservación y cancelación](${SITE_URL}/politicas)`)
+  lines.push(`- [Extras para tu estancia](${SITE_URL}/extras)`)
+  for (const l of LANDINGS) lines.push(`- [${l.title}](${SITE_URL}/${l.slug}): ${l.description}`)
 
   return new Response(lines.join('\n'), {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
