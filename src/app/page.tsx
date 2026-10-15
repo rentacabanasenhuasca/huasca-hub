@@ -8,6 +8,7 @@ import ShareSearchLink from '@/components/ShareSearchLink'
 import PublicAvailabilityGrid from '@/components/PublicAvailabilityGrid'
 import HeroCarousel from '@/components/HeroCarousel'
 import SiteFooter from '@/components/SiteFooter'
+import ForSaleBadge from '@/components/ForSaleBadge'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
@@ -68,12 +69,12 @@ export default async function Home({
   const { data: properties } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode'
+      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale'
     )
     .eq('status', 'published')
     .order('name')
 
-  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null })[]
+  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null; for_sale: boolean | null })[]
   const propertyIds = typedProperties.map((p) => p.id)
   // El anfitrión "real": el dueño de las propiedades publicadas. Sirve para
   // filtrar la portada (hero_media) — si por alguna razón llegara a existir
@@ -375,7 +376,7 @@ export default async function Home({
                     <Link
                       key={property.id}
                       href={`/cabanas/${property.slug}?${query.toString()}`}
-                      className="group block rounded-3xl border border-stone/10 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-deep/10"
+                      className="group relative block rounded-3xl border border-stone/10 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-deep/10"
                     >
                       {coverByProperty.get(property.id) ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -390,6 +391,7 @@ export default async function Home({
                           Sin foto
                         </div>
                       )}
+                      {property.for_sale && <ForSaleBadge className="top-3 left-3 w-16" />}
                       <div className="p-5">
                         <h3 className="font-display text-xl text-navy-deep">{property.name}</h3>
                         <p className="text-sm text-stone mt-1.5">
