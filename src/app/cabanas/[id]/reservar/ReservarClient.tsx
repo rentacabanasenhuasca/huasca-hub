@@ -157,7 +157,9 @@ export default function ReservarClient({
     setProvider(next)
     if (next === 'stripe' && !clientSecret) {
       setLoadingProvider('stripe')
-      const result = await createStripePaymentIntent({ propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code })
+      const result = await createStripePaymentIntent({ propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code }).catch(
+        (err: unknown) => ({ error: `No se pudo iniciar el pago (${err instanceof Error ? err.message : 'error de conexión'}). Intenta de nuevo.` })
+      )
       setLoadingProvider(null)
       if ('error' in result) {
         setError(result.error ?? 'Ocurrió un error inesperado.')
@@ -171,7 +173,14 @@ export default function ReservarClient({
   async function handleStripeConfirmed(paymentIntentId: string) {
     setFinalizing(true)
     setError(null)
-    const result = await finalizeStripeBooking(paymentIntentId, { propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code })
+    // Si la acción del servidor falla (conexión, error inesperado), no dejamos
+    // la pantalla en "Procesando…": mostramos el error y lo registramos en el
+    // carrito para verlo en /admin/carritos.
+    const result = await finalizeStripeBooking(paymentIntentId, { propertyId, checkin, checkout, guests, guestInfo, addonSelections, discountCode: appliedCoupon?.code }).catch(
+      (err: unknown) => ({
+        error: `Tu pago se procesó pero no pudimos confirmar la reserva (${err instanceof Error ? err.message : 'error de conexión'}). No vuelvas a pagar: escríbenos por WhatsApp y la confirmamos.`,
+      })
+    )
     if ('error' in result) {
       setFinalizing(false)
       setError(result.error ?? 'Ocurrió un error inesperado.')
@@ -204,7 +213,9 @@ export default function ReservarClient({
       paymentMethodId: data.payment_method_id,
       issuerId: data.issuer_id,
       installments: data.installments,
-    })
+    }).catch((err: unknown) => ({
+      error: `No se pudo procesar el pago con Mercado Pago (${err instanceof Error ? err.message : 'error de conexión'}). Intenta de nuevo o paga con tarjeta (Stripe).`,
+    }))
     if ('error' in result) {
       setFinalizing(false)
       setError(result.error ?? 'Ocurrió un error inesperado.')

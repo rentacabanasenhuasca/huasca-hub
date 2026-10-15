@@ -184,14 +184,36 @@ export async function finalizeStripeBooking(paymentIntentId: string, params: Che
 // Mercado Pago
 // ----------------------------------------------------------------------------
 
-export async function createMercadoPagoPayment(
-  params: CheckoutParams & {
-    token: string
-    paymentMethodId: string
-    issuerId?: string
-    installments: number
+type MercadoPagoParams = CheckoutParams & {
+  token: string
+  paymentMethodId: string
+  issuerId?: string
+  installments: number
+}
+
+// Mercado Pago lanza excepciones (en vez de regresar un status) cuando su API
+// responde con error — p. ej. datos del pagador inválidos o un token vencido.
+// Si la excepción llegaba hasta el navegador, la pantalla de pago se quedaba
+// "Procesando…" para siempre. Aquí la atrapamos y regresamos un error legible.
+function mercadoPagoErrorText(err: unknown): string {
+  const e = err as { message?: string; cause?: unknown; error?: string; status?: number }
+  const cause = Array.isArray(e?.cause) ? (e.cause as { description?: string; code?: string | number }[]) : []
+  const detail = cause.map((c) => c.description || String(c.code ?? '')).filter(Boolean).join('; ')
+  return [e?.message, detail].filter(Boolean).join(' — ') || 'error desconocido'
+}
+
+export async function createMercadoPagoPayment(params: MercadoPagoParams) {
+  try {
+    return await createMercadoPagoPaymentInner(params)
+  } catch (err) {
+    console.error('[mercadopago] createMercadoPagoPayment falló:', err)
+    return {
+      error: `Mercado Pago no pudo procesar el pago (${mercadoPagoErrorText(err)}). Intenta de nuevo o paga con tarjeta (Stripe).`,
+    }
   }
-) {
+}
+
+async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
   const supabase = createServiceClient()
   const property = await loadProperty(params.propertyId)
   const quote = await getBookingQuote(supabase, property, params.checkin, params.checkout, params.guests)
