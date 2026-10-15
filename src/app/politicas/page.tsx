@@ -1,7 +1,7 @@
 import { LegalPageShell, Section, SubHeading, List } from '@/components/legal/LegalPageLayout'
 
 export const metadata = {
-  title: 'Políticas de Huasca Retreats',
+  title: 'Políticas de reservación y cancelación',
   description:
     'Políticas de cancelaciones, cambios, reembolsos, garantía de reserva y uso del método de pago de Huasca Retreats.',
   // Sin esto hereda canonical "/" del layout y Google la trata como copia de la portada.
