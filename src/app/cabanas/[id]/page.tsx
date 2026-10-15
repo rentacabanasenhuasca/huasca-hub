@@ -12,10 +12,23 @@ import SiteFooter from '@/components/SiteFooter'
 import TrackViewContent from '@/components/TrackViewContent'
 import TrackedBookLink from '@/components/TrackedBookLink'
 import type { Metadata } from 'next'
-import { SITE_URL, SITE_NAME } from '@/lib/site'
+import { SITE_URL } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
 import { Suspense } from 'react'
 import CabinAvailabilityCalendar from '@/components/CabinAvailabilityCalendar'
+import { LANDINGS } from '@/lib/seo-landings'
+
+// Rasgo principal de la cabaña para el <title> y la descripción (lo que más
+// se busca: jacuzzi, techo de cristal, chimenea).
+function seoFeatures(name: string, description: string | null, amenities: string[]) {
+  const has = (l: string) => amenities.some((a) => a.toLowerCase() === l.toLowerCase())
+  const out: string[] = []
+  if (has('Jacuzzi')) out.push('jacuzzi privado')
+  if (/glasshouse/i.test(name) || /techo de cristal/i.test(description ?? '')) out.push('techo de cristal')
+  if (has('Chimenea interior')) out.push('chimenea')
+  if (has('Fogata / fogatero')) out.push('fogata')
+  return out
+}
 
 function waLink(phone: string, text: string) {
   const digits = phone.replace(/[^\d]/g, '')
@@ -52,7 +65,7 @@ export async function generateMetadata({
 
   const { data: property } = await supabase
     .from('properties')
-    .select('id, name, slug, description, capacity, bedrooms, bathrooms, weekday_price_mxn')
+    .select('id, name, slug, description, capacity, bedrooms, bathrooms, weekday_price_mxn, pet_friendly')
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
     .maybeSingle()
@@ -67,10 +80,20 @@ export async function generateMetadata({
     .limit(1)
     .maybeSingle()
 
-  const title = `${property.name} — Cabaña en Huasca de Ocampo hasta ${property.capacity} huéspedes`
-  const description =
-    property.description?.slice(0, 155) ||
-    `${property.name}: cabaña de ${property.bedrooms} recámaras y ${property.bathrooms} baños en Huasca de Ocampo, Hidalgo. Reserva en línea con ${SITE_NAME}, precios y disponibilidad en tiempo real.`
+  const { data: amenityRows } = await supabase
+    .from('property_amenities')
+    .select('amenities(label)')
+    .eq('property_id', property.id)
+  const amenityLabels = ((amenityRows ?? []) as unknown as { amenities: { label: string } | { label: string }[] | null }[])
+    .map((r) => (Array.isArray(r.amenities) ? r.amenities[0]?.label : r.amenities?.label))
+    .filter((l): l is string => Boolean(l))
+  const features = seoFeatures(property.name, property.description, amenityLabels)
+
+  const title = features.length
+    ? `${property.name}: cabaña con ${features[0]} en Huasca de Ocampo`
+    : `${property.name}: cabaña en Huasca de Ocampo para ${property.capacity} personas`
+  const featureText = features.length ? `, con ${features.join(', ')}` : ''
+  const description = `${property.name}, cabaña en el bosque de Huasca de Ocampo, Hidalgo, para hasta ${property.capacity} huéspedes${featureText}${property.pet_friendly ? '. Pet friendly' : ''}. Desde $${Number(property.weekday_price_mxn).toLocaleString('es-MX')} MXN por noche. Reserva directo y sin comisiones.`
 
   return {
     title,
@@ -224,6 +247,11 @@ export default async function CabanaPage({
     },
     petsAllowed: property.pet_friendly,
     numberOfRooms: property.bedrooms,
+    amenityFeature: [...amenityGroups.values()].flat().slice(0, 40).map((label) => ({
+      '@type': 'LocationFeatureSpecification',
+      name: label,
+      value: true,
+    })),
     occupancy: { '@type': 'QuantitativeValue', maxValue: property.capacity },
     priceRange: `$${property.weekday_price_mxn} - $${property.weekend_price_mxn} MXN`,
   }
@@ -233,6 +261,19 @@ export default async function CabanaPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Cabañas en Huasca de Ocampo', item: SITE_URL },
+              { '@type': 'ListItem', position: 2, name: property.name, item: `${SITE_URL}/cabanas/${property.slug}` },
+            ],
+          }),
+        }}
       />
       <div className="sticky top-4 z-30 px-4">
         <div className="max-w-5xl mx-auto flex flex-col gap-3 rounded-[28px] border border-stone/10 bg-white/90 backdrop-blur-md px-5 py-3 shadow-[0_1px_3px_rgba(16,27,40,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-2 sm:pr-2.5">
@@ -258,7 +299,7 @@ export default async function CabanaPage({
 
       <main className="max-w-5xl mx-auto px-4 pt-8 pb-6 sm:pt-10 sm:pb-8">
         <TrackViewContent id={property.id} name={property.name} price={property.weekday_price_mxn} />
-        <PhotoGallery photos={photos ?? []} alt={property.name} />
+        <PhotoGallery photos={photos ?? []} alt={`${property.name}, cabaña en Huasca de Ocampo`} />
 
         <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10">
           <div>
@@ -460,6 +501,21 @@ export default async function CabanaPage({
             </div>
           </div>
         </div>
+
+        <section className="mt-12 pt-8 border-t border-stone/10">
+          <h2 className="font-display text-xl text-navy-deep mb-4">Más cabañas en Huasca de Ocampo</h2>
+          <div className="flex flex-wrap gap-2">
+            {LANDINGS.map((l) => (
+              <Link
+                key={l.slug}
+                href={`/${l.slug}`}
+                className="rounded-full border border-stone/20 bg-white px-4 py-2 text-sm text-navy-deep hover:border-gold transition"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </section>
       </main>
 
       <SiteFooter />
