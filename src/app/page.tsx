@@ -12,6 +12,7 @@ import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
 import { optimizedImage } from '@/lib/media'
+import { LANDINGS, GENERAL_FAQS } from '@/lib/seo-landings'
 
 // Cuántos días hacia adelante se muestran en el calendario de disponibilidad
 // de todas las propiedades, al pie de la página de inicio.
@@ -36,8 +37,9 @@ type PublicProperty = {
 }
 
 export const metadata: Metadata = {
-  title: `${SITE_NAME} — Renta de cabañas en Huasca de Ocampo, Hidalgo`,
-  description: SITE_DESCRIPTION,
+  title: { absolute: `Cabañas en Huasca de Ocampo con jacuzzi, chimenea y glamping | ${SITE_NAME}` },
+  description:
+    'Renta de cabañas en Huasca de Ocampo, Hidalgo, a 2 horas de la CDMX: jacuzzi privado, chimenea, techo de cristal y pet friendly. Reserva directo, sin comisiones.',
   alternates: { canonical: '/' },
 }
 
@@ -226,6 +228,16 @@ export default async function Home({
           ;[results[i], results[j]] = [results[j], results[i]]
     }
 
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: GENERAL_FAQS.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  }
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LodgingBusiness',
@@ -258,6 +270,7 @@ export default async function Home({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       {/* Nav flotante — con el buscador compacto siempre a la mano, no
           solo el que está grande en el hero (ver más abajo). */}
       <div className="sticky top-4 z-30 px-4">
@@ -314,7 +327,7 @@ export default async function Home({
             className="animate-fade-up font-display font-black text-4xl sm:text-6xl lg:text-7xl text-cream leading-[1.05]"
             style={{ animationDelay: '80ms' }}
           >
-            Cabañas y casas
+            Cabañas en Huasca de Ocampo
             <br className="hidden sm:block" /> entre bosque y niebla
           </h1>
           <p
@@ -437,6 +450,52 @@ export default async function Home({
             </div>
           </div>
         )}
+
+        {/* Contenido para buscadores (y para quien quiere conocer más antes
+            de reservar): texto con las búsquedas principales del nicho,
+            links a las páginas por intención y preguntas frecuentes. */}
+        <section className="py-12 border-t border-stone/10">
+          <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-4">
+            Hospedaje en Huasca de Ocampo, a 2 horas de la CDMX
+          </h2>
+          <div className="space-y-4 text-stone leading-relaxed max-w-3xl">
+            <p>
+              Huasca Retreats es renta directa de cabañas en Huasca de Ocampo, Hidalgo, el primer Pueblo Mágico de
+              México. Nuestras cabañas están en el bosque, con privacidad, fogata y asador; algunas tienen jacuzzi
+              privado, chimenea o techo de cristal para dormir viendo las estrellas.
+            </p>
+            <p>
+              Hay opciones para parejas, familias y grupos de hasta 14 personas, y la mayoría son pet friendly. Desde
+              aquí visitas los Prismas Basálticos, la Peña del Aire, el Bosque de las Truchas y las haciendas de Santa
+              María Regla y San Miguel Regla. Reservas directo con nosotros: ves el precio total al instante y pagas
+              en línea, sin comisiones de intermediarios.
+            </p>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {LANDINGS.map((l) => (
+              <Link
+                key={l.slug}
+                href={`/${l.slug}`}
+                className="rounded-full border border-stone/20 bg-white px-4 py-2 text-sm text-navy-deep hover:border-gold transition"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+
+          <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mt-12 mb-5">Preguntas frecuentes</h2>
+          <div className="space-y-3">
+            {GENERAL_FAQS.map((f) => (
+              <details key={f.q} className="rounded-2xl border border-stone/10 bg-white p-4 sm:p-5 group">
+                <summary className="cursor-pointer font-medium text-navy-deep list-none flex justify-between gap-3">
+                  {f.q}
+                  <span className="text-gold group-open:rotate-45 transition">+</span>
+                </summary>
+                <p className="mt-3 text-sm text-stone leading-relaxed">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
       </main>
 
       <SiteFooter />
