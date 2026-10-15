@@ -66,6 +66,7 @@ function buildPropertyPayload(formData: FormData) {
       | 'draft'
       | 'published',
     booking_mode: (formData.get('booking_mode') === 'whatsapp' ? 'whatsapp' : 'online') as 'online' | 'whatsapp',
+    for_sale: formData.get('for_sale') === 'on',
 
     min_nights: num(formData, 'min_nights') ?? 1,
     min_nights_by_day: parseMinNightsByDay(formData),
@@ -140,6 +141,7 @@ async function syncBeds(
   const roomTypes = formData.getAll('bed_room_type').map(String)
   const bedTypes = formData.getAll('bed_type').map(String)
   const quantities = formData.getAll('bed_quantity').map(String)
+  const roomNumbers = formData.getAll('bed_room_number').map(String)
 
   await supabase.from('property_beds').delete().eq('property_id', propertyId)
 
@@ -147,6 +149,8 @@ async function syncBeds(
     .map((bedType, i) => ({
       property_id: propertyId,
       room_type: roomTypes[i] === 'altillo_tapanco' || roomTypes[i] === 'otro' ? roomTypes[i] : 'recamara',
+      room_number:
+        roomTypes[i] === 'altillo_tapanco' || roomTypes[i] === 'otro' ? null : Math.max(1, Number(roomNumbers[i]) || 1),
       bed_type: bedType,
       quantity: Math.max(1, Number(quantities[i]) || 1),
       sort_order: i,
@@ -297,7 +301,7 @@ export async function duplicateProperty(propertyId: string) {
         .eq('property_id', propertyId),
       supabase
         .from('property_beds')
-        .select('room_type, bed_type, quantity, sort_order')
+        .select('room_type, room_number, bed_type, quantity, sort_order')
         .eq('property_id', propertyId),
     ])
 
@@ -322,6 +326,7 @@ export async function duplicateProperty(propertyId: string) {
         beds.map((b) => ({
           property_id: newProperty.id,
           room_type: b.room_type,
+          room_number: b.room_number,
           bed_type: b.bed_type,
           quantity: b.quantity,
           sort_order: b.sort_order,

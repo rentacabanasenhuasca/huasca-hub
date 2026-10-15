@@ -29,6 +29,7 @@ export type PropertyRecord = {
   pet_friendly: boolean
   status: 'draft' | 'published'
   booking_mode?: 'online' | 'whatsapp' | null
+  for_sale?: boolean
   min_nights: number
   min_nights_by_day: Record<string, number> | null
   max_nights: number | null
@@ -44,7 +45,23 @@ export type PhotoRecord = { url: string; category: string | null; description: s
 // arreglo, que cambia mientras las fotos siguen subiendo.
 type PhotoRow = PhotoRecord & { _key: string }
 
-export type BedRecord = { room_type: 'recamara' | 'altillo_tapanco' | 'otro'; bed_type: string; quantity: number }
+export type BedRecord = {
+  room_type: 'recamara' | 'altillo_tapanco' | 'otro'
+  room_number?: number | null
+  bed_type: string
+  quantity: number
+}
+
+// Una recámara puede tener varias camas de distinto tipo: cada fila es un tipo
+// de cama y el select de espacio dice en qué recámara (1, 2, 3…) está.
+const MAX_ROOMS = 12
+function spaceValue(r: Pick<BedRecord, 'room_type' | 'room_number'>) {
+  return r.room_type === 'recamara' ? `recamara:${r.room_number ?? 1}` : r.room_type
+}
+function parseSpace(v: string): Pick<BedRecord, 'room_type' | 'room_number'> {
+  if (v.startsWith('recamara:')) return { room_type: 'recamara', room_number: Number(v.slice(9)) || 1 }
+  return { room_type: v as BedRecord['room_type'], room_number: null }
+}
 type BedRow = BedRecord & { _key: string }
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
@@ -126,7 +143,7 @@ export default function PropertyForm({
   const [bedRows, setBedRows] = useState<BedRow[]>(
     beds.length > 0
       ? beds.map((b) => ({ ...b, _key: uuid() }))
-      : [{ room_type: 'recamara', bed_type: 'matrimonial', quantity: 1, _key: uuid() }]
+      : [{ room_type: 'recamara', room_number: 1, bed_type: 'matrimonial', quantity: 1, _key: uuid() }]
   )
 
   async function uploadFile(key: string, file: File) {
@@ -269,36 +286,42 @@ export default function PropertyForm({
 
       <Section title="Camas">
         <p className="text-xs text-stone mb-3">
-          Especifica el tamaño de cada cama y si está en una recámara normal o en un altillo/tapanco,
-          para que el huésped sepa exactamente qué está rentando. El número de &quot;Camas&quot; de
-          arriba es solo el total; esta lista es la que se muestra en la página de la propiedad.
+          Especifica el tamaño de cada cama y en qué recámara está (o si está en un altillo/tapanco),
+          para que el huésped sepa exactamente qué está rentando. Si una recámara tiene camas de
+          distinto tipo (por ejemplo 1 king y 1 individual), agrega una fila por tipo y elige la misma
+          recámara en las dos. El número de &quot;Camas&quot; de arriba es solo el total; esta lista es
+          la que se muestra en la página de la propiedad.
         </p>
         <div className="space-y-3">
           {bedRows.map((row) => (
             <div key={row._key} className="grid sm:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
               <input type="hidden" name="bed_room_type" value={row.room_type} readOnly />
+              <input type="hidden" name="bed_room_number" value={row.room_number ?? ''} readOnly />
               <input type="hidden" name="bed_type" value={row.bed_type} readOnly />
               <input type="hidden" name="bed_quantity" value={row.quantity} readOnly />
               <label>
                 <span className={labelClass}>Espacio</span>
                 <select
-                  value={row.room_type}
+                  value={spaceValue(row)}
                   onChange={(e) =>
                     setBedRows((rows) =>
-                      rows.map((r) =>
-                        r._key === row._key
-                          ? { ...r, room_type: e.target.value as BedRecord['room_type'] }
-                          : r
-                      )
+                      rows.map((r) => (r._key === row._key ? { ...r, ...parseSpace(e.target.value) } : r))
                     )
                   }
                   className={inputClass}
                 >
-                  {Object.entries(ROOM_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
+                  {Array.from({ length: MAX_ROOMS }, (_, i) => (
+                    <option key={i} value={`recamara:${i + 1}`}>
+                      Recámara {i + 1}
                     </option>
                   ))}
+                  {Object.entries(ROOM_TYPE_LABELS)
+                    .filter(([value]) => value !== 'recamara')
+                    .map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label>
@@ -348,10 +371,21 @@ export default function PropertyForm({
         <button
           type="button"
           onClick={() =>
-            setBedRows((rows) => [
-              ...rows,
-              { room_type: 'recamara', bed_type: 'matrimonial', quantity: 1, _key: uuid() },
-            ])
+            setBedRows((rows) => {
+              // La nueva fila arranca en el mismo espacio que la última, así
+              // agregar otro tipo de cama a esa recámara es un solo clic.
+              const last = rows[rows.length - 1]
+              return [
+                ...rows,
+                {
+                  room_type: last?.room_type ?? 'recamara',
+                  room_number: last ? (last.room_number ?? null) : 1,
+                  bed_type: 'matrimonial',
+                  quantity: 1,
+                  _key: uuid(),
+                },
+              ]
+            })
           }
           className="text-sm text-gold underline underline-offset-2 mt-3"
         >
@@ -485,6 +519,20 @@ export default function PropertyForm({
               <option value="online">En línea (calendario, precio y pago en el sitio)</option>
               <option value="whatsapp">Solo por WhatsApp (se anuncia, pero preguntan disponibilidad por WhatsApp)</option>
             </select>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-navy-deep sm:col-span-2">
+            <input
+              type="checkbox"
+              name="for_sale"
+              defaultChecked={property?.for_sale ?? false}
+              className="mt-0.5 rounded border-stone/40"
+            />
+            <span>
+              Mostrar letrero de &quot;Se vende&quot; en la foto principal
+              <span className="block text-xs text-stone">
+                Un letrerito pequeño en la esquina de la foto de portada (inicio, páginas de búsqueda y página de la propiedad). Quítale la palomita para ocultarlo.
+              </span>
+            </span>
           </label>
         </div>
       </Section>
