@@ -37,7 +37,7 @@ export default async function EditarPropiedadPage({
         .order('sort_order'),
       supabase
         .from('property_beds')
-        .select('room_type, bed_type, quantity')
+        .select('room_type, room_number, bed_type, quantity')
         .eq('property_id', id)
         .order('sort_order'),
       supabase
