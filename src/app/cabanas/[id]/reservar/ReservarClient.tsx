@@ -13,6 +13,12 @@ import { saveCartAction, markCartAction } from './cart-actions'
 
 type Provider = 'stripe' | 'mercadopago'
 
+// Mercado Pago apagado: la cuenta no permite guardar la tarjeta (API de
+// clientes "UNAUTHORIZED"), y para Huasca es indispensable poder cobrar
+// daños/extras después. Con Stripe sí se guarda. Para volver a mostrarlo,
+// cambiar a true.
+const MERCADOPAGO_ENABLED = false
+
 export type AddonOption = {
   id: string
   name: string
@@ -392,7 +398,7 @@ export default function ReservarClient({
           </button>
 
           {!provider && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${MERCADOPAGO_ENABLED ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <button
                 onClick={() => chooseProvider('stripe')}
                 disabled={loadingProvider !== null}
@@ -400,13 +406,15 @@ export default function ReservarClient({
               >
                 {loadingProvider === 'stripe' ? 'Cargando…' : 'Pagar con tarjeta (Stripe)'}
               </button>
-              <button
-                onClick={() => chooseProvider('mercadopago')}
-                disabled={loadingProvider !== null}
-                className="rounded-2xl border border-stone/20 px-4 py-4 text-sm font-medium text-navy-deep hover:border-gold hover:bg-gold/5 transition disabled:opacity-50"
-              >
-                Mercado Pago
-              </button>
+              {MERCADOPAGO_ENABLED && (
+                <button
+                  onClick={() => chooseProvider('mercadopago')}
+                  disabled={loadingProvider !== null}
+                  className="rounded-2xl border border-stone/20 px-4 py-4 text-sm font-medium text-navy-deep hover:border-gold hover:bg-gold/5 transition disabled:opacity-50"
+                >
+                  Mercado Pago
+                </button>
+              )}
             </div>
           )}
 
