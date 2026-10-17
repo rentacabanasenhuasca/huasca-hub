@@ -4,6 +4,8 @@ import "./globals.css";
 import { createServiceClient } from "@/lib/supabase/service";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import MetaPixel from "@/components/MetaPixel";
+import NavigationProgress from "@/components/NavigationProgress";
+import { Suspense } from "react";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, CORE_KEYWORDS } from "@/lib/site";
 
 // Tipografía más bold y contemporánea que las fuentes de sistema que se
@@ -81,6 +83,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`h-full antialiased ${fraunces.variable} ${plusJakarta.variable}`}>
       <body className="min-h-full flex flex-col">
         <MetaPixel />
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         {children}
         <WhatsAppFloatButton phone={host?.phone ?? null} />
       </body>
