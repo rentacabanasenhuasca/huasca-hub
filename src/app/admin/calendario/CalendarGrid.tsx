@@ -69,6 +69,181 @@ type BookingDetails = {
   payment_provider: string | null
   created_at: string
   property_name: string
+  source?: string | null
+  stripe_payment_intent_id?: string | null
+  mp_payment_id?: string | null
+  discount_code?: string | null
+  discount_amount_mxn?: number | string | null
+  addons?: { name: string; quantity: number; unit_price_mxn: number; subtotal_mxn: number }[]
+}
+
+const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
+const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  confirmed: { label: 'Confirmada', cls: 'bg-emerald-50 text-emerald-700' },
+  cancelled: { label: 'Cancelada', cls: 'bg-red-50 text-red-700' },
+  pending: { label: 'Pendiente', cls: 'bg-amber-50 text-amber-700' },
+}
+function longDate(d: string) {
+  return new Date(`${d}T12:00:00Z`).toLocaleDateString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+function whatsappLink(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  return `https://wa.me/${digits.length === 10 ? `52${digits}` : digits}`
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-stone">{label}</dt>
+      <dd className="text-navy-deep">{children}</dd>
+    </div>
+  )
+}
+
+// Toda la información de una reserva directa: huésped, contacto, fechas,
+// extras contratados, desglose del cobro y datos del pago.
+function BookingInfo({ booking: b }: { booking: BookingDetails }) {
+  const addons = b.addons ?? []
+  const extrasTotal = addons.reduce((s, a) => s + a.subtotal_mxn, 0)
+  const total = Number(b.total_price_mxn) || 0
+  const discount = Number(b.discount_amount_mxn) || 0
+  const lodging = total - extrasTotal + discount
+  const nights = Math.round(
+    (Date.parse(`${b.check_out}T00:00:00Z`) - Date.parse(`${b.check_in}T00:00:00Z`)) / 86400000
+  )
+  const status = STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-stone/10 text-stone' }
+  const provider =
+    b.payment_provider === 'stripe'
+      ? 'Tarjeta (Stripe)'
+      : b.payment_provider === 'mercadopago'
+        ? 'Mercado Pago'
+        : b.payment_provider
+          ? b.payment_provider
+          : 'Sin pago en línea (reserva capturada a mano)'
+  const paymentId = b.stripe_payment_intent_id || b.mp_payment_id
+  const guestParts = [
+    `${b.adults} ${b.adults === 1 ? 'adulto' : 'adultos'}`,
+    b.children ? `${b.children} ${b.children === 1 ? 'niño' : 'niños'}` : null,
+    b.infants ? `${b.infants} ${b.infants === 1 ? 'bebé' : 'bebés'}` : null,
+    b.pets ? 'con mascota' : 'sin mascota',
+  ].filter(Boolean)
+
+  return (
+    <dl className="text-sm space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: SOURCE_COLOR.direct }} />
+        <span className="text-navy-deep font-medium">
+          {b.payment_provider ? 'Reserva directa (sitio web)' : 'Reserva manual'}
+        </span>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${status.cls}`}>{status.label}</span>
+      </div>
+
+      <InfoRow label="Huésped">
+        <span className="font-medium">{b.guest_name}</span>
+      </InfoRow>
+
+      <InfoRow label="Contacto">
+        <span className="flex flex-col gap-0.5">
+          {b.guest_phone ? (
+            <span>
+              <a href={`tel:${b.guest_phone}`} className="underline underline-offset-2">
+                {b.guest_phone}
+              </a>{' '}
+              ·{' '}
+              <a href={whatsappLink(b.guest_phone)} target="_blank" rel="noreferrer" className="text-[#128C7E] underline underline-offset-2">
+                WhatsApp
+              </a>
+            </span>
+          ) : (
+            <span className="text-stone">Sin teléfono</span>
+          )}
+          {b.guest_email ? (
+            <a href={`mailto:${b.guest_email}`} className="underline underline-offset-2 break-all">
+              {b.guest_email}
+            </a>
+          ) : (
+            <span className="text-stone">Sin correo</span>
+          )}
+        </span>
+      </InfoRow>
+
+      <InfoRow label="Cabaña">{b.property_name}</InfoRow>
+
+      <InfoRow label="Fechas">
+        Llega {longDate(b.check_in)} · Sale {longDate(b.check_out)}
+        <span className="block text-xs text-stone">
+          {nights} {nights === 1 ? 'noche' : 'noches'}
+        </span>
+      </InfoRow>
+
+      <InfoRow label="Huéspedes">{guestParts.join(', ')}</InfoRow>
+
+      <InfoRow label="Extras contratados">
+        {addons.length === 0 ? (
+          <span className="text-stone">Ninguno</span>
+        ) : (
+          <ul className="mt-0.5 space-y-0.5">
+            {addons.map((a, i) => (
+              <li key={i} className="flex justify-between gap-3">
+                <span>
+                  {a.quantity} × {a.name}
+                </span>
+                <span className="tabular-nums">{money(a.subtotal_mxn)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </InfoRow>
+
+      {b.guest_notes && <InfoRow label="Notas del huésped">{b.guest_notes}</InfoRow>}
+
+      <div className="rounded-lg bg-cream/60 p-3 space-y-1">
+        <div className="flex justify-between">
+          <span className="text-stone">Hospedaje</span>
+          <span className="tabular-nums text-navy-deep">{money(lodging)}</span>
+        </div>
+        {extrasTotal > 0 && (
+          <div className="flex justify-between">
+            <span className="text-stone">Extras</span>
+            <span className="tabular-nums text-navy-deep">{money(extrasTotal)}</span>
+          </div>
+        )}
+        {(discount > 0 || b.discount_code) && (
+          <div className="flex justify-between">
+            <span className="text-stone">Descuento{b.discount_code ? ` (${b.discount_code})` : ''}</span>
+            <span className="tabular-nums text-navy-deep">−{money(discount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between border-t border-stone/15 pt-1 font-semibold text-navy-deep">
+          <span>Total</span>
+          <span className="tabular-nums">{money(total)} MXN</span>
+        </div>
+      </div>
+
+      <InfoRow label="Pago">
+        {provider}
+        {paymentId && <span className="block text-xs text-stone break-all">ID del pago: {paymentId}</span>}
+      </InfoRow>
+
+      <InfoRow label="Reservado el">
+        {new Date(b.created_at).toLocaleString('es-MX', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: 'America/Mexico_City',
+        })}
+      </InfoRow>
+
+      <InfoRow label="Número de reserva">
+        <span className="font-mono text-xs break-all">{b.id}</span>
+      </InfoRow>
+    </dl>
+  )
 }
 
 // Colores para distinguir de dónde viene cada bloqueo, igual que se ve en
@@ -1307,64 +1482,7 @@ export default function CalendarGrid({
                 ) : detailsError ? (
                   <p className="text-sm text-burnt-orange">{detailsError}</p>
                 ) : bookingDetails ? (
-                  <dl className="text-sm space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: SOURCE_COLOR.direct }}
-                      />
-                      <span className="text-navy-deep font-medium">Reserva directa — {bookingDetails.status}</span>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-stone">Huésped</dt>
-                      <dd className="text-navy-deep">{bookingDetails.guest_name}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-stone">Contacto</dt>
-                      <dd className="text-navy-deep">
-                        {bookingDetails.guest_email || '—'} · {bookingDetails.guest_phone || '—'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-stone">Fechas</dt>
-                      <dd className="text-navy-deep">
-                        {bookingDetails.check_in} → {bookingDetails.check_out}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-stone">Huéspedes</dt>
-                      <dd className="text-navy-deep">
-                        {bookingDetails.adults} adultos, {bookingDetails.children} niños,{' '}
-                        {bookingDetails.infants} infantes · Mascotas: {bookingDetails.pets ? 'Sí' : 'No'}
-                      </dd>
-                    </div>
-                    {bookingDetails.guest_notes && (
-                      <div>
-                        <dt className="text-xs text-stone">Notas del huésped</dt>
-                        <dd className="text-navy-deep">{bookingDetails.guest_notes}</dd>
-                      </div>
-                    )}
-                    <div>
-                      <dt className="text-xs text-stone">Total pagado</dt>
-                      <dd className="text-navy-deep">
-                        ${Math.round(Number(bookingDetails.total_price_mxn)).toLocaleString('es-MX')} MXN ·{' '}
-                        {bookingDetails.payment_provider === 'stripe'
-                          ? 'Stripe'
-                          : bookingDetails.payment_provider === 'mercadopago'
-                            ? 'Mercado Pago'
-                            : (bookingDetails.payment_provider ?? '—')}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-stone">Reservado el</dt>
-                      <dd className="text-navy-deep">
-                        {new Date(bookingDetails.created_at).toLocaleString('es-MX', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
-                      </dd>
-                    </div>
-                  </dl>
+                  <BookingInfo booking={bookingDetails} />
                 ) : null
               ) : kind === 'airbnb' || kind === 'booking' || kind === 'ical-otro' ? (
                 <div className="text-sm space-y-2">

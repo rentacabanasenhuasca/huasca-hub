@@ -128,7 +128,7 @@ export async function getBookingDetails(bookingId: string) {
   const { data: booking } = await supabase
     .from('bookings')
     .select(
-      'id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants, pets, status, total_price_mxn, payment_provider, created_at, property_id, properties(host_id, name)'
+      'id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants, pets, status, source, total_price_mxn, payment_provider, stripe_payment_intent_id, mp_payment_id, discount_code, discount_amount_mxn, created_at, property_id, properties(host_id, name)'
     )
     .eq('id', bookingId)
     .maybeSingle()
@@ -138,7 +138,26 @@ export async function getBookingDetails(bookingId: string) {
     return { error: 'Esa reserva no existe.', booking: null }
   }
 
-  return { error: null, booking: { ...booking, property_name: property.name } }
+  // Extras que el huésped contrató junto con la reserva (leña, kits, etc.).
+  const { data: addons } = await supabase
+    .from('booking_addons')
+    .select('name, quantity, unit_price_mxn, subtotal_mxn')
+    .eq('booking_id', bookingId)
+    .order('created_at')
+
+  return {
+    error: null,
+    booking: {
+      ...booking,
+      property_name: property.name,
+      addons: (addons ?? []).map((a) => ({
+        name: a.name as string,
+        quantity: Number(a.quantity),
+        unit_price_mxn: Number(a.unit_price_mxn),
+        subtotal_mxn: Number(a.subtotal_mxn),
+      })),
+    },
+  }
 }
 
 // Cancela una reserva directa: la marca como 'cancelled' y libera sus fechas
