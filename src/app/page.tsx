@@ -182,8 +182,15 @@ export default async function Home({
       const fitsGuests = fitsProperty(property, guests)
       // Las cabañas "solo por WhatsApp" no muestran precio total ni se filtran
       // por disponibilidad: el huésped pregunta por WhatsApp.
-      if (!hasSearch || property.booking_mode === 'whatsapp') {
+      if (!hasSearch) {
         return { property, total: null as number | null, minNightsOk: true, minNightsRequired: 1, fitsGuests, isFree: true }
+      }
+      if (property.booking_mode === 'whatsapp') {
+        // Sin precio en línea, pero sí respetan las fechas ocupadas: si ya
+        // está bloqueada en esas fechas, no aparece como disponible.
+        const taken = blockedByProperty.get(property.id)
+        const isFree = !nights.some((d) => taken?.has(d))
+        return { property, total: null as number | null, minNightsOk: true, minNightsRequired: 1, fitsGuests, isFree }
       }
 
       const dayMap = dayMapByProperty.get(property.id)
@@ -439,11 +446,12 @@ export default async function Home({
             <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-5">Calendario de disponibilidad</h2>
             <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
               <PublicAvailabilityGrid
-                properties={typedProperties.filter((p) => p.booking_mode !== 'whatsapp').map((p) => ({
+                properties={typedProperties.map((p) => ({
                   id: p.id,
                   slug: p.slug,
                   name: p.name,
                   cover_photo_url: coverByProperty.get(p.id) ?? null,
+                  whatsapp: p.booking_mode === 'whatsapp',
                 }))}
                 windowStart={availabilityStart}
                 windowEnd={availabilityEnd}
