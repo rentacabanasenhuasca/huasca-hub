@@ -10,10 +10,13 @@ import EmailTemplates from './EmailTemplates'
 
 export default async function EditarPropiedadPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ error?: string }>
 }) {
   const { id } = await params
+  const { error: pageError } = await searchParams
   const host = await requireHost()
   const supabase = await createClient()
 
@@ -74,6 +77,21 @@ export default async function EditarPropiedadPage({
 
   return (
     <div>
+      {pageError === 'reservas' && (
+        <p className="mb-4 rounded-lg border border-burnt-orange/30 bg-burnt-orange/10 px-4 py-3 text-sm text-burnt-orange">
+          No se puede eliminar: esta propiedad tiene reservas confirmadas por venir. Cancélalas o muévelas a otra cabaña desde el calendario y vuelve a intentarlo.
+        </p>
+      )}
+      {pageError === 'archivar' && (
+        <p className="mb-4 rounded-lg border border-burnt-orange/30 bg-burnt-orange/10 px-4 py-3 text-sm text-burnt-orange">
+          No se pudo eliminar la propiedad. Intenta de nuevo.
+        </p>
+      )}
+      {property.archived_at && (
+        <p className="mb-4 rounded-lg border border-stone/20 bg-cream px-4 py-3 text-sm text-stone">
+          Esta propiedad está eliminada (archivada): no aparece en el admin ni en el sitio.
+        </p>
+      )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-navy-deep">{property.name}</h1>
         <div className="flex items-center gap-4">
@@ -84,7 +102,7 @@ export default async function EditarPropiedadPage({
           </form>
           <form action={boundDelete}>
           <ConfirmSubmitButton
-            confirmMessage={`¿Seguro que quieres eliminar "${property.name}"? Esto borra también sus fotos, amenidades y reglas de precio aplicadas. No se puede deshacer.`}
+            confirmMessage={`¿Seguro que quieres eliminar "${property.name}"? Dejará de aparecer en el admin, el calendario y el sitio. Su historial de reservas y sus fotos se conservan.`}
             className="text-sm text-burnt-orange hover:underline"
           >
             Eliminar propiedad
