@@ -27,6 +27,7 @@ export default async function CalendarioPage({
     .from('properties')
     .select('id, name, weekday_price_mxn, weekend_price_mxn, min_nights')
     .eq('host_id', host.id)
+    .is('archived_at', null)
     .order('name')
 
   const { data: rules } = await supabase
