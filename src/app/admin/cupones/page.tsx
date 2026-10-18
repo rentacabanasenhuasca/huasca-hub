@@ -18,6 +18,7 @@ export default async function CuponesPage() {
     .from('properties')
     .select('id, name')
     .eq('host_id', host.id)
+    .is('archived_at', null)
     .order('name')
 
   const discountIds = (discounts ?? []).map((d) => d.id)
