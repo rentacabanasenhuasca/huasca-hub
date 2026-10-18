@@ -16,6 +16,7 @@ export default async function ExtrasPage() {
     .from('properties')
     .select('id, name')
     .eq('host_id', host.id)
+    .is('archived_at', null)
     .order('name')
 
   const addonIds = (addons ?? []).map((a) => a.id)
