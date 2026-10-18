@@ -252,11 +252,33 @@ export async function deleteProperty(propertyId: string) {
   const host = await requireHost()
   const supabase = await createClient()
 
-  const { data: photos } = await supabase.from('property_photos').select('url').eq('property_id', propertyId)
-  await supabase.from('properties').delete().eq('id', propertyId).eq('host_id', host.id)
-  await removeUnreferencedFiles((photos ?? []).map((r) => r.url))
+  // "Eliminar" archiva la propiedad en vez de borrarla: desaparece del admin,
+  // del calendario y del sitio, pero se conserva su historial de reservas,
+  // sus fotos y los datos de revenue que apuntan a ella. (Un borrado real
+  // fallaba en silencio por esas referencias y además se llevaba el historial.)
+  const today = new Date().toISOString().slice(0, 10)
+  const { count: upcoming } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('property_id', propertyId)
+    .eq('status', 'confirmed')
+    .gte('check_out', today)
+  if ((upcoming ?? 0) > 0) {
+    redirect(`/admin/propiedades/${propertyId}?error=reservas`)
+  }
+
+  const { error } = await supabase
+    .from('properties')
+    .update({ archived_at: new Date().toISOString(), status: 'draft' })
+    .eq('id', propertyId)
+    .eq('host_id', host.id)
+  if (error) redirect(`/admin/propiedades/${propertyId}?error=archivar`)
+
+  // Los colaboradores ya no deben verla en su panel.
+  await supabase.from('staff_property_access').delete().eq('property_id', propertyId)
 
   revalidatePath('/admin/propiedades')
+  revalidatePath('/')
   redirect('/admin/propiedades')
 }
 

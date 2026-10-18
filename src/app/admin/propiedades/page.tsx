@@ -10,6 +10,7 @@ export default async function PropiedadesPage() {
     .from('properties')
     .select('id, name, status, capacity, bedrooms, weekday_price_mxn, weekend_price_mxn, pet_friendly')
     .eq('host_id', host.id)
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
 
   const propertyIds = (properties ?? []).map((p) => p.id)
