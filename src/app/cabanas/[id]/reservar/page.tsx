@@ -149,6 +149,11 @@ export default async function ReservarPage({
               <span>{guestsSummary(guests)}</span>
             </div>
 
+            {quote!.minGuestsCharged && (
+              <p className="mb-4 rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-navy-deep">
+                En estas fechas la tarifa mínima de esta cabaña es para {quote!.minGuestsCharged} personas, aunque vengan menos. El total ya lo incluye.
+              </p>
+            )}
             <ReservarClient
               propertyId={property.id}
               checkin={checkin!}
