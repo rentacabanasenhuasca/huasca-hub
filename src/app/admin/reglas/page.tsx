@@ -16,6 +16,7 @@ export default async function ReglasPage() {
     .from('properties')
     .select('id, name')
     .eq('host_id', host.id)
+    .is('archived_at', null)
     .order('name')
 
   return (
