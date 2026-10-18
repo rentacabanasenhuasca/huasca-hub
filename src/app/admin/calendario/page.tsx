@@ -30,6 +30,10 @@ export default async function CalendarioPage({
     .is('archived_at', null)
     .order('name')
 
+  // Semáforo de temporada (alta/media/baja). Tabla chica: se carga completa
+  // para que el color siga bien aunque el calendario se desplace de meses.
+  const { data: seasons } = await supabase.from('season_days').select('date, level, label')
+
   const { data: rules } = await supabase
     .from('pricing_rules')
     .select('id, name, color, priority')
@@ -149,6 +153,7 @@ export default async function CalendarioPage({
           blockedDates={blockedDates ?? []}
           minNightsOverrides={minNightsOverrides ?? []}
           priceOverrides={priceOverrides ?? []}
+          seasons={(seasons ?? []) as { date: string; level: 'alta' | 'media' | 'baja'; label: string | null }[]}
         />
       )}
     </div>

@@ -355,6 +355,23 @@ function eachDateInRange(start: string, end: string) {
   return dates
 }
 
+// Semáforo de temporada por noche. Las fechas especiales (puentes,
+// vacaciones, Navidad…) vienen de la tabla season_days; sin fila, viernes y
+// sábado cuentan como media y el resto como baja.
+type SeasonLevel = 'alta' | 'media' | 'baja'
+type SeasonDay = { date: string; level: SeasonLevel; label: string | null }
+const SEASON_STYLE: Record<SeasonLevel, { bg: string; name: string }> = {
+  alta: { bg: '#dc2626', name: 'Temporada alta' },
+  media: { bg: '#f59e0b', name: 'Temporada media' },
+  baja: { bg: '#16a34a', name: 'Temporada baja' },
+}
+function seasonOf(map: Map<string, SeasonDay>, date: string, weekday: number): { level: SeasonLevel; label: string } {
+  const s = map.get(date)
+  if (s) return { level: s.level, label: s.label ?? '' }
+  if (weekday === 5 || weekday === 6) return { level: 'media', label: 'Fin de semana' }
+  return { level: 'baja', label: 'Entre semana' }
+}
+
 function daysBetween(from: string, to: string) {
   return Math.round((parseDate(to).getTime() - parseDate(from).getTime()) / 86400000)
 }
@@ -371,6 +388,7 @@ export default function CalendarGrid({
   blockedDates,
   minNightsOverrides,
   priceOverrides,
+  seasons = [],
 }: {
   year: number
   month: number
@@ -383,8 +401,10 @@ export default function CalendarGrid({
   blockedDates: BlockedDate[]
   minNightsOverrides: MinNightsOverride[]
   priceOverrides: PriceOverride[]
+  seasons?: SeasonDay[]
 }) {
   const router = useRouter()
+  const seasonMap = useMemo(() => new Map(seasons.map((s) => [s.date, s])), [seasons])
   const [isPending, startTransition] = useTransition()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [dragMode, setDragMode] = useState<'add' | 'remove' | null>(null)
@@ -1153,6 +1173,31 @@ export default function CalendarGrid({
                   {g.label}
                 </th>
               ))}
+            </tr>
+            <tr>
+              <th className="sticky left-0 bg-white z-10 text-left px-3 py-1 border-b border-stone/15 font-normal">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-stone leading-tight">
+                  <span className="font-semibold text-navy-deep">Temporada</span>
+                  {(['alta', 'media', 'baja'] as SeasonLevel[]).map((l) => (
+                    <span key={l} className="flex items-center gap-0.5" title={SEASON_STYLE[l].name}>
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SEASON_STYLE[l].bg }} />
+                      {l}
+                    </span>
+                  ))}
+                </div>
+              </th>
+              {days.map((d) => {
+                const s = seasonOf(seasonMap, d.date, d.weekday)
+                return (
+                  <th
+                    key={d.date}
+                    title={`${SEASON_STYLE[s.level].name}${s.label ? ` — ${s.label}` : ''}`}
+                    className="px-0.5 py-1 border-b border-stone/15"
+                  >
+                    <div className="h-2 rounded-full" style={{ backgroundColor: SEASON_STYLE[s.level].bg }} />
+                  </th>
+                )
+              })}
             </tr>
             <tr>
               <th className="sticky left-0 bg-white z-10 text-left px-3 py-2 text-navy-deep border-b border-stone/15">
