@@ -10,7 +10,7 @@ export default async function EquipoPage() {
 
   const [{ data: staff }, { data: properties }] = await Promise.all([
     service.from('staff_members').select('*').eq('host_id', host.id).order('created_at', { ascending: true }),
-    service.from('properties').select('id, name').eq('host_id', host.id).order('name'),
+    service.from('properties').select('id, name').eq('host_id', host.id).is('archived_at', null).order('name'),
   ])
 
   const staffIds = (staff ?? []).map((s) => s.id)
