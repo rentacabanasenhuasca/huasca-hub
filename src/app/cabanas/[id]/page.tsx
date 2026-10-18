@@ -195,6 +195,7 @@ export default async function CabanaPage({
   let minNightsRequired = property.min_nights
   let isFree = true
   let minNightsOk = true
+  let minGuestsCharged: number | null = null
 
   if (hasSearch && !whatsappOnly) {
     const quote = await getBookingQuote(supabase, property, checkin!, checkout!, guests)
@@ -203,6 +204,7 @@ export default async function CabanaPage({
     minNightsRequired = quote.minNightsRequired
     minNightsOk = quote.minNightsOk
     isFree = quote.isFree
+    minGuestsCharged = quote.minGuestsCharged
   }
 
   const fitsGuests = fitsProperty(property, guests)
@@ -476,6 +478,11 @@ export default async function CabanaPage({
                       <span>Total</span>
                       <span>${Math.round(total ?? 0).toLocaleString('es-MX')} MXN</span>
                     </div>
+                    {minGuestsCharged && (
+                      <p className="mt-1 text-xs text-stone">
+                        En estas fechas la tarifa mínima es para {minGuestsCharged} personas; el total ya lo incluye.
+                      </p>
+                    )}
                     <TrackedBookLink
                       href={`/cabanas/${property.slug}/reservar?checkin=${checkin}&checkout=${checkout}&adults=${guests.adults}&children=${guests.children}&infants=${guests.infants}&pets=${guests.pets}`}
                       className="mt-4 block text-center w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition"
