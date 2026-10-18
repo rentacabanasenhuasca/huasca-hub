@@ -74,6 +74,8 @@ type BookingDetails = {
   mp_payment_id?: string | null
   discount_code?: string | null
   discount_amount_mxn?: number | string | null
+  coupon_type?: string | null
+  coupon_value?: number | null
   addons?: { name: string; quantity: number; unit_price_mxn: number; subtotal_mxn: number }[]
 }
 
@@ -198,6 +200,18 @@ function BookingInfo({ booking: b }: { booking: BookingDetails }) {
               </li>
             ))}
           </ul>
+        )}
+      </InfoRow>
+
+      <InfoRow label="Cupón de descuento">
+        {b.discount_code ? (
+          <span>
+            Sí, usó <span className="font-medium">{b.discount_code}</span>
+            {b.coupon_value ? ` (${b.coupon_type === 'percent' ? `${b.coupon_value}%` : money(b.coupon_value)})` : ''} · ahorró{' '}
+            {money(discount)}
+          </span>
+        ) : (
+          <span className="text-stone">No usó cupón</span>
         )}
       </InfoRow>
 

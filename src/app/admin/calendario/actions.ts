@@ -128,7 +128,7 @@ export async function getBookingDetails(bookingId: string) {
   const { data: booking } = await supabase
     .from('bookings')
     .select(
-      'id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants, pets, status, source, total_price_mxn, payment_provider, stripe_payment_intent_id, mp_payment_id, discount_code, discount_amount_mxn, created_at, property_id, properties(host_id, name)'
+      'id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants, pets, status, source, total_price_mxn, payment_provider, stripe_payment_intent_id, mp_payment_id, discount_code, discount_code_id, discount_amount_mxn, created_at, property_id, properties(host_id, name)'
     )
     .eq('id', bookingId)
     .maybeSingle()
@@ -145,11 +145,22 @@ export async function getBookingDetails(bookingId: string) {
     .eq('booking_id', bookingId)
     .order('created_at')
 
+  // Cupón usado (si hubo): tipo y valor, para mostrar "10%" o "$500".
+  const { data: coupon } = booking.discount_code_id
+    ? await supabase
+        .from('discount_codes')
+        .select('discount_type, discount_value')
+        .eq('id', booking.discount_code_id)
+        .maybeSingle()
+    : { data: null }
+
   return {
     error: null,
     booking: {
       ...booking,
       property_name: property.name,
+      coupon_type: (coupon?.discount_type as string | undefined) ?? null,
+      coupon_value: coupon ? Number(coupon.discount_value) : null,
       addons: (addons ?? []).map((a) => ({
         name: a.name as string,
         quantity: Number(a.quantity),
