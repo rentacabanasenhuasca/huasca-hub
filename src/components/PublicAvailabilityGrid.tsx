@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef } from 'react'
 import { optimizedImage } from '@/lib/media'
 
-type Property = { id: string; slug: string; name: string; cover_photo_url: string | null }
+type Property = { id: string; slug: string; name: string; cover_photo_url: string | null; whatsapp?: boolean }
 type BlockedDate = { property_id: string; date: string }
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
@@ -160,7 +160,12 @@ export default function PublicAvailabilityGrid({
                       ) : (
                         <span className="h-7 w-7 rounded-md bg-cream shrink-0 border border-stone/15" />
                       )}
-                      <span className="truncate">{property.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{property.name}</span>
+                        {property.whatsapp && (
+                          <span className="block text-[10px] font-normal text-[#128C7E]">Reserva por WhatsApp</span>
+                        )}
+                      </span>
                     </Link>
                   </div>
                 </td>
