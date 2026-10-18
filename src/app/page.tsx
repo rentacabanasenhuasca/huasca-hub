@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createServiceClient } from '@/lib/supabase/service'
 import { recomputeCalendarRange, nightsBetween, isWeekendNight } from '@/lib/calendar'
-import { parseGuestsFromParams, fitsProperty, extraGuestsFor, guestsSummary } from '@/lib/occupancy'
+import { parseGuestsFromParams, fitsProperty, occupantsFor, guestsSummary } from '@/lib/occupancy'
 import CompactSearchForm from '@/components/CompactSearchForm'
 import ShareSearchLink from '@/components/ShareSearchLink'
 import PublicAvailabilityGrid from '@/components/PublicAvailabilityGrid'
@@ -144,6 +144,7 @@ export default async function Home({
   let nights: string[] = []
   const dayMapByProperty = new Map<string, Map<string, { price_mxn: number; extra_guest_fee_mxn: number; min_nights: number }>>()
   const blockedByProperty = new Map<string, Set<string>>()
+  const minGuestsByProperty = new Map<string, Map<string, number>>()
 
   if (hasSearch && propertyIds.length > 0) {
     nights = nightsBetween(checkin!, checkout!)
@@ -152,7 +153,7 @@ export default async function Home({
     // fechas aunque el host nunca las haya abierto en su calendario.
     await recomputeCalendarRange(supabase, propertyIds, checkin!, lastNight)
 
-    const [{ data: days }, { data: blocked }] = await Promise.all([
+    const [{ data: days }, { data: blocked }, { data: minGuestRows }] = await Promise.all([
       supabase
         .from('calendar_days')
         .select('property_id, date, price_mxn, extra_guest_fee_mxn, min_nights')
@@ -165,7 +166,18 @@ export default async function Home({
         .in('property_id', propertyIds)
         .gte('date', checkin!)
         .lte('date', lastNight),
+      supabase
+        .from('min_guests_overrides')
+        .select('property_id, date, min_guests')
+        .in('property_id', propertyIds)
+        .gte('date', checkin!)
+        .lte('date', lastNight),
     ])
+
+    for (const r of minGuestRows ?? []) {
+      if (!minGuestsByProperty.has(r.property_id)) minGuestsByProperty.set(r.property_id, new Map())
+      minGuestsByProperty.get(r.property_id)!.set(r.date, Number(r.min_guests))
+    }
 
     for (const d of days ?? []) {
       if (!dayMapByProperty.has(d.property_id)) dayMapByProperty.set(d.property_id, new Map())
@@ -195,13 +207,17 @@ export default async function Home({
 
       const dayMap = dayMapByProperty.get(property.id)
       const blockedDates = blockedByProperty.get(property.id)
-      const extraGuests = extraGuestsFor(property, guests)
+      const occupants = occupantsFor(property, guests)
+      const minGuestsMap = minGuestsByProperty.get(property.id)
       let total = 0
       let minNightsRequired = property.min_nights
       let isFree = true
 
       for (const date of nights) {
         if (blockedDates?.has(date)) isFree = false
+        // Cobro mínimo por personas en esa noche (si lo hay).
+        const minGuests = Math.min(minGuestsMap?.get(date) ?? 0, property.capacity)
+        const extraGuests = Math.max(0, Math.max(occupants, minGuests) - property.base_occupancy)
         const cd = dayMap?.get(date)
         if (cd) {
           total += Number(cd.price_mxn) + Number(cd.extra_guest_fee_mxn) * extraGuests
