@@ -34,6 +34,15 @@ export default async function CalendarioPage({
   // para que el color siga bien aunque el calendario se desplace de meses.
   const { data: seasons } = await supabase.from('season_days').select('date, level, label')
 
+  // Mínimo de personas a cobrar por fecha (tabla chica: se carga completa).
+  const { data: minGuests } =
+    (properties ?? []).length > 0
+      ? await supabase
+          .from('min_guests_overrides')
+          .select('property_id, date, min_guests')
+          .in('property_id', (properties ?? []).map((p) => p.id))
+      : { data: [] as { property_id: string; date: string; min_guests: number }[] }
+
   const { data: rules } = await supabase
     .from('pricing_rules')
     .select('id, name, color, priority')
@@ -153,6 +162,7 @@ export default async function CalendarioPage({
           blockedDates={blockedDates ?? []}
           minNightsOverrides={minNightsOverrides ?? []}
           priceOverrides={priceOverrides ?? []}
+          minGuestsOverrides={minGuests ?? []}
           seasons={(seasons ?? []) as { date: string; level: 'alta' | 'media' | 'baja'; label: string | null }[]}
         />
       )}

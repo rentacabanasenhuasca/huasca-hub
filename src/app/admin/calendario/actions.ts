@@ -362,6 +362,44 @@ export async function setManualBlock(selections: Selection[], blocked: boolean, 
   return { error: null, keys: selections.map((s) => `${s.propertyId}|${s.date}`), blocked: blockedRows }
 }
 
+// Fija (o quita) el mínimo de personas a cobrar para fechas exactas: si
+// reservan menos personas, se cobra como si fueran ese mínimo (precio base +
+// personas extra). null quita el ajuste.
+export async function setMinGuestsOverride(selections: Selection[], minGuests: number | null) {
+  const host = await requireHost()
+  const supabase = await createClient()
+
+  if (selections.length === 0) return { error: 'No hay fechas seleccionadas.' }
+  if (minGuests != null && minGuests < 1) return { error: 'El mínimo de personas debe ser al menos 1.' }
+
+  const byProperty = groupByProperty(selections)
+  const { data: props } = await supabase
+    .from('properties')
+    .select('id, name, capacity')
+    .eq('host_id', host.id)
+    .in('id', [...byProperty.keys()])
+  if ((props ?? []).length !== byProperty.size) return { error: 'Propiedad no encontrada.' }
+
+  if (minGuests != null) {
+    const tooBig = (props ?? []).find((p) => minGuests > p.capacity)
+    if (tooBig) return { error: `${tooBig.name} tiene cupo para ${tooBig.capacity} personas; el mínimo no puede ser mayor.` }
+    const rows = selections.map((s) => ({ property_id: s.propertyId, date: s.date, min_guests: minGuests }))
+    const { error } = await supabase.from('min_guests_overrides').upsert(rows, { onConflict: 'property_id,date' })
+    if (error) return { error: `No se pudo guardar: ${error.message}` }
+  } else {
+    const results = await Promise.all(
+      [...byProperty.entries()].map(([propertyId, dates]) =>
+        supabase.from('min_guests_overrides').delete().eq('property_id', propertyId).in('date', dates)
+      )
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return { error: `No se pudo quitar: ${failed.error.message}` }
+  }
+
+  revalidatePath('/admin/calendario')
+  return { error: null }
+}
+
 // Fija (o quita) la noche mínima para fechas exactas, con prioridad sobre el
 // mínimo de la propiedad y sobre cualquier regla de precio — igual que el
 // campo "Noches mínimas" del panel de fechas de Airbnb. minNights = null

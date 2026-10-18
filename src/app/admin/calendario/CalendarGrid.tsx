@@ -8,6 +8,7 @@ import {
   loadCalendarWindow,
   setManualBlock,
   setMinNightsOverride,
+  setMinGuestsOverride,
   setPriceOverride,
   getBookingDetails,
   cancelBooking,
@@ -51,6 +52,7 @@ type BlockedDate = {
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
 }
 type MinNightsOverride = { property_id: string; date: string; min_nights: number }
+type MinGuestsOverride = { property_id: string; date: string; min_guests: number }
 type PriceOverride = { property_id: string; date: string; price_mxn: number }
 type BookingDetails = {
   id: string
@@ -388,6 +390,7 @@ export default function CalendarGrid({
   blockedDates,
   minNightsOverrides,
   priceOverrides,
+  minGuestsOverrides = [],
   seasons = [],
 }: {
   year: number
@@ -401,6 +404,7 @@ export default function CalendarGrid({
   blockedDates: BlockedDate[]
   minNightsOverrides: MinNightsOverride[]
   priceOverrides: PriceOverride[]
+  minGuestsOverrides?: MinGuestsOverride[]
   seasons?: SeasonDay[]
 }) {
   const router = useRouter()
@@ -411,6 +415,13 @@ export default function CalendarGrid({
   const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [minNightsInput, setMinNightsInput] = useState('')
+  const [minGuestsInput, setMinGuestsInput] = useState('')
+  const [minGuestsState, setMinGuestsState] = useState(minGuestsOverrides)
+  const minGuestsMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const o of minGuestsState) m.set(`${o.property_id}|${o.date}`, o.min_guests)
+    return m
+  }, [minGuestsState])
   const [priceInput, setPriceInput] = useState('')
   const [blockNoteInput, setBlockNoteInput] = useState('')
 
@@ -839,6 +850,33 @@ export default function CalendarGrid({
         }
       }
       setSelected(new Set())
+    })
+  }
+
+  // Mínimo de personas a cobrar en las fechas seleccionadas (cobro mínimo).
+  function saveMinGuests() {
+    if (selected.size === 0) return
+    setError(null)
+    const trimmed = minGuestsInput.trim()
+    const n = trimmed === '' ? null : Number(trimmed)
+    if (n != null && (!Number.isInteger(n) || n < 1)) {
+      setError('El mínimo de personas debe ser un número entero de al menos 1 (o vacío para quitar el ajuste).')
+      return
+    }
+    const selections = selectionToSelections()
+    startTransition(async () => {
+      const res = await setMinGuestsOverride(selections, n)
+      if (res?.error) {
+        setError(res.error)
+        return
+      }
+      const keySet = new Set(selections.map((s) => key(s.propertyId, s.date)))
+      setMinGuestsState((prev) => [
+        ...prev.filter((o) => !keySet.has(key(o.property_id, o.date))),
+        ...(n != null ? selections.map((s) => ({ property_id: s.propertyId, date: s.date, min_guests: n })) : []),
+      ])
+      setSelected(new Set())
+      setMinGuestsInput('')
     })
   }
 
@@ -1276,6 +1314,14 @@ export default function CalendarGrid({
                         <span className={blocked ? 'text-stone line-through' : 'text-navy-deep'}>
                           {cd ? Math.round(Number(cd.price_mxn)).toLocaleString('es-MX') : '—'}
                         </span>
+                        {minGuestsMap.get(key(property.id, d.date)) && (
+                          <span
+                            title={`Se cobra mínimo ${minGuestsMap.get(key(property.id, d.date))} personas`}
+                            className="rounded bg-navy/10 px-1 text-[9px] font-medium leading-tight text-navy"
+                          >
+                            mín {minGuestsMap.get(key(property.id, d.date))}p
+                          </span>
+                        )}
                         {kind === 'manual' && blocked?.blocked_by && (
                           <span className="max-w-[64px] truncate rounded bg-burnt-orange/15 px-1 text-[9px] font-medium leading-tight text-burnt-orange">
                             {blocked.blocked_by.split(' ')[0]}
@@ -1410,6 +1456,34 @@ export default function CalendarGrid({
             {isPending ? 'Guardando…' : 'Guardar noches mínimas'}
           </button>
           <span className="text-xs text-stone">Deja el campo vacío y guarda para quitar el ajuste.</span>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-stone/10">
+          <label>
+            <span className="block text-xs font-medium text-stone uppercase tracking-wide mb-1">
+              Mínimo de personas a cobrar
+            </span>
+            <input
+              type="number"
+              min={1}
+              placeholder="Ej. 10"
+              value={minGuestsInput}
+              onChange={(e) => setMinGuestsInput(e.target.value)}
+              disabled={selected.size === 0}
+              className="w-24 rounded-lg border border-stone/30 bg-white px-3 py-1.5 text-sm text-navy-deep disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={selected.size === 0 || isPending}
+            onClick={saveMinGuests}
+            className="rounded-lg bg-navy px-4 py-1.5 text-sm font-medium text-cream hover:bg-navy-deep transition disabled:opacity-40"
+          >
+            {isPending ? 'Guardando…' : 'Guardar mínimo de personas'}
+          </button>
+          <span className="text-xs text-stone">
+            Si reservan menos personas, se cobra como si fueran este mínimo (precio base + personas extra). Vacío y guardar = quitar.
+          </span>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-stone/10">
