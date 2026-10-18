@@ -351,9 +351,15 @@ export default async function CabanaPage({
               </div>
             )}
 
-            {!whatsappOnly && (
+            {/* Todas las cabañas muestran su disponibilidad sincronizada,
+                incluidas las que se reservan por WhatsApp. */}
             <div id="disponibilidad" className="mt-8 pt-8 border-t border-stone/10 scroll-mt-40">
               <h2 className="font-display text-xl text-navy-deep mb-4">Disponibilidad</h2>
+              {whatsappOnly && (
+                <p className="text-sm text-stone -mt-2 mb-4">
+                  Elige tus fechas libres en el calendario y te confirmamos por WhatsApp.
+                </p>
+              )}
               <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
                 <Suspense fallback={null}>
                   <CabinAvailabilityCalendar
@@ -366,7 +372,6 @@ export default async function CabanaPage({
                 </Suspense>
               </div>
             </div>
-            )}
 
             <div className="mt-8 pt-8 border-t border-stone/10 text-sm text-stone space-y-1.5">
               <p>Estancia mínima: {property.min_nights} noche(s){property.max_nights ? ` · máxima ${property.max_nights}` : ''}</p>
