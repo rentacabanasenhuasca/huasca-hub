@@ -585,6 +585,7 @@ export default function CalendarGrid({
       // si se vuelve a mover.
       setDetailsFor((prev) => (prev ? { ...prev, propertyId: res.newPropertyId! } : prev))
       setMoveTarget('')
+      await syncFromServer()
     })
   }
 
@@ -606,6 +607,7 @@ export default function CalendarGrid({
       setBookingDetails((prev) => (prev ? { ...prev, status: 'cancelled' } : prev))
       setConfirmingCancel(false)
       setActionMessage(res.warning ?? 'Reserva cancelada y fechas liberadas.')
+      await syncFromServer()
     })
   }
 
@@ -684,6 +686,23 @@ export default function CalendarGrid({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  // Vuelve a leer del servidor todo lo que está cargado en pantalla. Se llama
+  // después de cualquier cambio (bloquear, reservar, reglas, precios…) para
+  // que el calendario muestre el estado real sin tener que recargar la página.
+  async function syncFromServer() {
+    if (propertyIds.length === 0) return
+    try {
+      const res = await loadCalendarWindow(propertyIds, loadedStart, loadedEnd)
+      setCalendarDaysState(res.days)
+      setBlockedDatesState(res.blocked ?? [])
+      setMinNightsOverridesState(res.minNightsOverrides ?? [])
+      setPriceOverridesState(res.priceOverrides ?? [])
+    } catch {
+      // Si falla la relectura, el cambio ya se guardó; se verá al recargar.
+    }
+    router.refresh()
+  }
 
   async function loadMore(direction: 'before' | 'after') {
     if (loadingMoreRef.current || propertyIds.length === 0) return
@@ -802,7 +821,10 @@ export default function CalendarGrid({
     startTransition(async () => {
       const res = await applyRuleToSelection(selectedRuleId, selections)
       if (res?.error) setError(res.error)
-      else setSelected(new Set())
+      else {
+        setSelected(new Set())
+        await syncFromServer()
+      }
     })
   }
 
@@ -837,6 +859,7 @@ export default function CalendarGrid({
         ...(res.blocked ?? []),
       ])
       if (blocked) setBlockNoteInput('')
+      await syncFromServer()
       // "Abrir fechas" solo quita bloqueos manuales — si alguna celda
       // seleccionada sigue bloqueada por una reserva real o por otro
       // calendario (iCal), no se libera aquí (para no des-sincronizar
@@ -909,6 +932,7 @@ export default function CalendarGrid({
       ])
       setSelected(new Set())
       setMinNightsInput('')
+      await syncFromServer()
     })
   }
 
@@ -943,6 +967,7 @@ export default function CalendarGrid({
       ])
       setSelected(new Set())
       setPriceInput('')
+      await syncFromServer()
     })
   }
 
@@ -950,6 +975,7 @@ export default function CalendarGrid({
     if (!window.confirm('¿Quitar esta regla de estas fechas? El precio de esos días vuelve al base.')) return
     startTransition(async () => {
       await removeApplication(id)
+      await syncFromServer()
     })
   }
 
@@ -990,6 +1016,7 @@ export default function CalendarGrid({
         setQuickStart('')
         setQuickEnd('')
         setShowQuickApply(false)
+        await syncFromServer()
       }
     })
   }
@@ -1770,7 +1797,9 @@ export default function CalendarGrid({
             // bloqueo queda con su booking_id real de una vez (necesario
             // para que el panel de detalle ⓘ pueda abrirlo).
             setShowManualBooking(false)
-            router.refresh()
+            startTransition(async () => {
+              await syncFromServer()
+            })
           }}
         />
       )}
