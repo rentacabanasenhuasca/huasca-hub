@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { requireStaff } from '@/lib/staff'
 import { signOut } from '@/app/login/actions'
+import NewVersionBanner from '@/components/NewVersionBanner'
+import { getBuildId } from '@/lib/build-id'
 
 export const metadata: Metadata = {
   title: 'Panel de colaborador — Huasca Retreats',
@@ -24,6 +26,7 @@ export default async function EquipoLayout({ children }: { children: React.React
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">{children}</main>
+      <NewVersionBanner buildId={getBuildId()} />
     </div>
   )
 }
