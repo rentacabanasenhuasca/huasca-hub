@@ -82,6 +82,11 @@ export default async function Home({
   // esto evita que se cuelen fotos/videos de un host distinto al del sitio.
   const hostId = typedProperties[0]?.host_id ?? null
 
+  // WhatsApp del anfitrión, para el mensaje de "sin disponibilidad".
+  const { data: hostContact } = hostId
+    ? await supabase.from('hosts').select('phone').eq('id', hostId).maybeSingle()
+    : { data: null as { phone: string | null } | null }
+
   const { data: photos } =
     propertyIds.length > 0
       ? await supabase
@@ -450,17 +455,55 @@ export default async function Home({
                   )
                 })}
               </div>
-              {hasSearch && results.length === 0 && (
-                <p className="text-stone text-sm">
-                  No hay cabañas disponibles para esas fechas/huéspedes. Prueba con otras fechas.
-                </p>
-              )}
+              {hasSearch && results.length === 0 && (() => {
+                // Mensaje amable cuando ya no hay espacio en las fechas buscadas.
+                const fmt = (d: string) =>
+                  new Date(`${d}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+                const phoneDigits = (hostContact?.phone ?? '').replace(/\D/g, '')
+                const waHref = phoneDigits
+                  ? `https://wa.me/${phoneDigits.length === 10 ? `52${phoneDigits}` : phoneDigits}?text=${encodeURIComponent(
+                      `Hola, busqué cabaña del ${fmt(checkin!)} al ${fmt(checkout!)} para ${guestsSummary(guests)} y ya no aparece disponibilidad. ¿Me pueden ayudar con alguna opción?`
+                    )}`
+                  : null
+                return (
+                  <div className="rounded-3xl border border-gold/30 bg-white px-6 py-8 sm:px-10 sm:py-10 text-center shadow-sm">
+                    <p className="text-4xl" aria-hidden>🌲</p>
+                    <h3 className="mt-3 font-display text-2xl text-navy-deep">¡Gracias por pensar en nosotros!</h3>
+                    <p className="mt-3 text-stone leading-relaxed max-w-xl mx-auto">
+                      Lo sentimos mucho: del <span className="font-medium text-navy-deep">{fmt(checkin!)}</span> al{' '}
+                      <span className="font-medium text-navy-deep">{fmt(checkout!)}</span> ya no contamos con espacios
+                      disponibles{guests.adults + guests.children > 0 ? ` para ${guestsSummary(guests)}` : ''}. Nos encantaría
+                      recibirte en otra ocasión: prueba con otras fechas o escríbenos y con gusto te ayudamos a encontrar la
+                      mejor opción.
+                      {jacuzziOnly && ' También puedes quitar el filtro de jacuzzi para ver más cabañas.'}
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-3">
+                      {waHref && (
+                        <a
+                          href={waHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition"
+                        >
+                          Escríbenos por WhatsApp
+                        </a>
+                      )}
+                      <a
+                        href="#calendario-disponibilidad"
+                        className="rounded-full border border-navy-deep/20 px-5 py-2.5 text-sm font-semibold text-navy-deep hover:border-gold transition"
+                      >
+                        Ver fechas disponibles
+                      </a>
+                    </div>
+                  </div>
+                )
+              })()}
             </>
           )}
         </div>
 
         {properties && properties.length > 0 && (
-          <div className="py-12">
+          <div id="calendario-disponibilidad" className="py-12 scroll-mt-28">
             <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-5">Calendario de disponibilidad</h2>
             <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
               <PublicAvailabilityGrid
