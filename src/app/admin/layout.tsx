@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { requireHost } from '@/lib/hosts'
 import { signOut } from '@/app/login/actions'
+import NewVersionBanner from '@/components/NewVersionBanner'
+import { getBuildId } from '@/lib/build-id'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const host = await requireHost()
@@ -63,6 +65,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">{children}</main>
+      <NewVersionBanner buildId={getBuildId()} />
     </div>
   )
 }
