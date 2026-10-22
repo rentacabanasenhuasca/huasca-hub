@@ -27,6 +27,10 @@ export default function SiteFooter() {
             Reglamento
           </Link>
           <span className="text-stone/30">·</span>
+          <Link href="/en-venta" className="hover:text-stone hover:underline underline-offset-2 transition">
+            Casas en venta
+          </Link>
+          <span className="text-stone/30">·</span>
           <Link href="/extras" className="hover:text-stone hover:underline underline-offset-2 transition">
             Extras
           </Link>
