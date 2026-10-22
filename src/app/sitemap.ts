@@ -18,6 +18,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
+  const { data: saleListings } = await supabase
+    .from('sale_listings')
+    .select('slug')
+    .eq('status', 'published')
+  const saleEntries: MetadataRoute.Sitemap = (saleListings ?? []).map((l) => ({
+    url: `${SITE_URL}/en-venta/${l.slug}`,
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }))
+
   return [
     {
       url: SITE_URL,
@@ -46,6 +56,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: 0.9,
     })),
+    {
+      url: `${SITE_URL}/en-venta`,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
     ...propertyEntries,
+    ...saleEntries,
   ]
 }
