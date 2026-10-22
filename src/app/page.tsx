@@ -87,6 +87,27 @@ export default async function Home({
     ? await supabase.from('hosts').select('phone').eq('id', hostId).maybeSingle()
     : { data: null as { phone: string | null } | null }
 
+  // Casas en venta: si hay alguna publicada, se muestra un aviso con link a
+  // /en-venta (con la foto de portada de la primera).
+  const { data: saleListings } = await supabase
+    .from('sale_listings')
+    .select('id')
+    .eq('status', 'published')
+    .order('sort_order')
+    .order('created_at', { ascending: false })
+  const saleCount = saleListings?.length ?? 0
+  const { data: saleCover } =
+    saleCount > 0
+      ? await supabase
+          .from('sale_listing_media')
+          .select('url')
+          .eq('listing_id', saleListings![0].id)
+          .eq('kind', 'image')
+          .order('sort_order')
+          .limit(1)
+          .maybeSingle()
+      : { data: null as { url: string } | null }
+
   const { data: photos } =
     propertyIds.length > 0
       ? await supabase
@@ -520,6 +541,37 @@ export default async function Home({
               />
             </div>
           </div>
+        )}
+
+        {saleCount > 0 && (
+          <section className="py-6">
+            <Link
+              href="/en-venta"
+              className="group grid overflow-hidden rounded-3xl bg-navy-deep text-cream shadow-sm sm:grid-cols-[1.1fr_1fr]"
+            >
+              <div className="flex flex-col justify-center gap-3 p-7 sm:p-10">
+                <p className="text-xs uppercase tracking-[0.2em] text-gold-light">Casas en venta</p>
+                <h2 className="font-display text-2xl sm:text-4xl">¿Buscas comprar casa en Huasca?</h2>
+                <p className="text-sm sm:text-base text-cream/80">
+                  {saleCount === 1
+                    ? 'Tenemos una casa en venta en el Pueblo Mágico. Conoce fotos, precio y todos los detalles.'
+                    : `Tenemos ${saleCount} casas en venta en el Pueblo Mágico. Conoce fotos, precios y todos los detalles.`}
+                </p>
+                <span className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-navy-deep group-hover:bg-gold-light transition">
+                  Ver casas en venta →
+                </span>
+              </div>
+              {saleCover?.url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={optimizedImage(saleCover.url, 828)}
+                  alt="Casa en venta en Huasca de Ocampo"
+                  loading="lazy"
+                  className="h-56 w-full object-cover sm:h-full group-hover:scale-[1.02] transition"
+                />
+              )}
+            </Link>
+          </section>
         )}
 
         {/* Contenido para buscadores (y para quien quiere conocer más antes
