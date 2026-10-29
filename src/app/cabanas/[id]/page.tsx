@@ -6,7 +6,7 @@ import { parseGuestsFromParams, fitsProperty, guestsSummary } from '@/lib/occupa
 import { getBookingQuote } from '@/lib/booking-quote'
 import { isUuid } from '@/lib/is-uuid'
 import GuestPicker from '@/components/GuestPicker'
-import CompactSearchForm from '@/components/CompactSearchForm'
+import DateRangePicker from '@/components/DateRangePicker'
 import PhotoGallery from '@/components/PhotoGallery'
 import SiteFooter from '@/components/SiteFooter'
 import TrackViewContent from '@/components/TrackViewContent'
@@ -301,9 +301,6 @@ export default async function CabanaPage({
               />
             </Link>
           </div>
-          <div className="sm:order-2">
-            <CompactSearchForm defaultCheckin={checkin} defaultCheckout={checkout} defaultGuests={guests} />
-          </div>
         </div>
       </div>
 
@@ -408,30 +405,11 @@ export default async function CabanaPage({
               </div>
             )}
             <form method="get" className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <label>
-                  <span className="block text-xs font-medium text-stone mb-1">Llegada</span>
-                  <input
-                    type="date"
-                    name="checkin"
-                    defaultValue={checkin}
-                    min={todayInMexicoStr()}
-                    required
-                    className="w-full rounded-xl border border-stone/25 px-2.5 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
-                  />
-                </label>
-                <label>
-                  <span className="block text-xs font-medium text-stone mb-1">Salida</span>
-                  <input
-                    type="date"
-                    name="checkout"
-                    defaultValue={checkout}
-                    min={checkin || todayInMexicoStr()}
-                    required
-                    className="w-full rounded-xl border border-stone/25 px-2.5 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
-                  />
-                </label>
-              </div>
+              <DateRangePicker
+                defaultCheckin={checkin}
+                defaultCheckout={checkout}
+                blockedDates={(availabilityBlocked ?? []).map((b) => b.date)}
+              />
               <label className="block">
                 <span className="block text-xs font-medium text-stone mb-1">Huéspedes</span>
                 <GuestPicker defaultGuests={guests} />
