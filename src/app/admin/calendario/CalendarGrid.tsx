@@ -7,6 +7,7 @@ import {
   removeApplication,
   loadCalendarWindow,
   setManualBlock,
+  forceOpenDates,
   setMinNightsOverride,
   setMinGuestsOverride,
   setPriceOverride,
@@ -868,9 +869,47 @@ export default function CalendarGrid({
         const stillBlocked = (res.blocked ?? []).filter((b) => b.source !== 'manual')
         if (stillBlocked.length > 0) {
           setError(
-            `${stillBlocked.length} fecha(s) no se liberaron porque tienen una reserva real u otro calendario sincronizado. Para liberarlas, cancela la reserva desde el panel de detalle (ⓘ) de esa celda.`
+            `${stillBlocked.length} fecha(s) no se liberaron porque tienen una reserva u otro calendario sincronizado. Si quieres venderlas de nuevo de todos modos, usa "Abrir aunque esté reservada".`
           )
         }
+      }
+      setSelected(new Set())
+    })
+  }
+
+  // Overbooking: abre las celdas aunque tengan una reserva. La reserva no se
+  // cancela ni se reembolsa; solo deja de ocupar esas noches.
+  function openDespiteBooking() {
+    if (selected.size === 0) return
+    const selections = selectionToSelections()
+    const withBooking = selections.filter((s) => {
+      const b = blockedMap.get(key(s.propertyId, s.date))
+      return b && b.source !== 'manual' && b.source !== 'ical'
+    }).length
+    const ok = window.confirm(
+      withBooking > 0
+        ? `Vas a abrir ${selections.length} fecha(s), ${withBooking} de ellas con una reserva.\n\nLa reserva NO se cancela ni se reembolsa: sigue registrada con su pago, pero esas noches quedan libres para volver a venderse (en el sitio y en Airbnb/Booking por el calendario sincronizado).\n\n¿Continuar?`
+        : `¿Abrir ${selections.length} fecha(s)?`
+    )
+    if (!ok) return
+    setError(null)
+    startTransition(async () => {
+      const res = await forceOpenDates(selections)
+      if (res?.error) {
+        setError(res.error)
+        return
+      }
+      const keySet = new Set(res.keys ?? [])
+      setBlockedDatesState((prev) => [
+        ...prev.filter((b) => !keySet.has(key(b.property_id, b.date))),
+        ...(res.blocked ?? []),
+      ])
+      await syncFromServer()
+      const stillBlocked = res.blocked ?? []
+      if (stillBlocked.length > 0) {
+        setError(
+          `${stillBlocked.length} fecha(s) siguen ocupadas porque vienen del calendario de Airbnb/Booking. Esas hay que liberarlas en la propia plataforma; si no, se vuelven a bloquear solas.`
+        )
       }
       setSelected(new Set())
     })
@@ -1445,6 +1484,15 @@ export default function CalendarGrid({
             className="rounded-lg border border-burnt-orange text-burnt-orange px-3 py-1.5 text-sm font-medium hover:bg-burnt-orange/10 transition disabled:opacity-40"
           >
             Bloquear fechas
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0 || isPending}
+            onClick={openDespiteBooking}
+            title="Overbooking: libera las noches aunque tengan una reserva. La reserva no se cancela ni se reembolsa."
+            className="rounded-lg border border-navy-deep/40 text-navy-deep px-3 py-1.5 text-sm font-medium hover:bg-navy-deep/5 transition disabled:opacity-40"
+          >
+            Abrir aunque esté reservada
           </button>
           <label className="flex items-center gap-2">
             <span className="text-xs text-stone">Nota (opcional):</span>

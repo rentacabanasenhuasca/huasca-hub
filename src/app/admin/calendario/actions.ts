@@ -362,6 +362,47 @@ export async function setManualBlock(selections: Selection[], blocked: boolean, 
   return { error: null, keys: selections.map((s) => `${s.propertyId}|${s.date}`), blocked: blockedRows }
 }
 
+// Overbooking: abre las fechas seleccionadas aunque estén ocupadas por una
+// reserva (o un bloqueo manual), para poder volver a venderlas — p. ej.
+// cuando el huésped se movió a otra cabaña por fuera del sistema. La reserva
+// NO se cancela ni se reembolsa: sigue registrada con su pago, solo deja de
+// ocupar esas noches en el calendario (y en el iCal que lee Airbnb).
+//
+// Los días bloqueados por el iCal de Airbnb/Booking NO se abren aquí: esa
+// plataforma los volvería a mandar en la siguiente sincronización (cada
+// minuto). Para esos, hay que liberar la fecha en la propia plataforma.
+export async function forceOpenDates(selections: Selection[]) {
+  await requireHost()
+  const supabase = await createClient()
+
+  if (selections.length === 0) return { error: 'No hay fechas seleccionadas.' }
+
+  const byProperty = groupByProperty(selections)
+
+  const results = await Promise.all(
+    [...byProperty.entries()].map(([propertyId, dates]) =>
+      supabase.from('blocked_dates').delete().eq('property_id', propertyId).neq('source', 'ical').in('date', dates)
+    )
+  )
+  const failed = results.find((r) => r.error)
+  if (failed?.error) return { error: `No se pudieron abrir: ${failed.error.message}` }
+
+  const updated = await Promise.all(
+    [...byProperty.entries()].map(([propertyId, dates]) =>
+      supabase
+        .from('blocked_dates')
+        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
+        .eq('property_id', propertyId)
+        .in('date', dates)
+    )
+  )
+  const blockedRows = updated.flatMap((r) => r.data ?? [])
+
+  revalidatePath('/admin/calendario')
+  revalidatePath('/')
+  return { error: null, keys: selections.map((s) => `${s.propertyId}|${s.date}`), blocked: blockedRows }
+}
+
 // Fija (o quita) el mínimo de personas a cobrar para fechas exactas: si
 // reservan menos personas, se cobra como si fueran ese mínimo (precio base +
 // personas extra). null quita el ajuste.
