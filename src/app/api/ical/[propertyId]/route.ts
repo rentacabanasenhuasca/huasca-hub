@@ -39,19 +39,49 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
   // siga "confirmed" en la base — así, aunque algo más vuelva a dejar una
   // reserva huérfana en el futuro, nunca se le avisa a una plataforma externa
   // de una fecha ocupada que ya no existe en nuestro propio calendario.
+  //
+  // Además, si el anfitrión abrió algunas noches de una reserva a la fuerza
+  // (overbooking, desde el calendario del panel), solo se exportan las noches
+  // que la reserva todavía ocupa — no todo su check-in → check-out.
   const bookingIds = (bookingsRaw ?? []).map((b) => b.id)
-  const blockedBookingIds = new Set<string>()
+  const nightsByBooking = new Map<string, string[]>()
   if (bookingIds.length > 0) {
     const { data: blocked } = await supabase
       .from('blocked_dates')
-      .select('booking_id')
+      .select('booking_id, date')
       .eq('property_id', propertyId)
       .in('booking_id', bookingIds)
+      .order('date')
     for (const row of blocked ?? []) {
-      if (row.booking_id) blockedBookingIds.add(row.booking_id)
+      if (!row.booking_id) continue
+      const list = nightsByBooking.get(row.booking_id) ?? []
+      list.push(row.date)
+      nightsByBooking.set(row.booking_id, list)
     }
   }
-  const bookings = (bookingsRaw ?? []).filter((b) => blockedBookingIds.has(b.id))
+  const nextNight = (d: string) => {
+    const x = new Date(`${d}T00:00:00Z`)
+    x.setUTCDate(x.getUTCDate() + 1)
+    return x.toISOString().slice(0, 10)
+  }
+  // Tramos continuos de noches ocupadas por cada reserva.
+  const bookings: { id: string; check_in: string; check_out: string }[] = []
+  for (const b of bookingsRaw ?? []) {
+    const nights = nightsByBooking.get(b.id)
+    if (!nights || nights.length === 0) continue
+    let start = nights[0]
+    let end = nextNight(nights[0])
+    for (const n of nights.slice(1)) {
+      if (n === end) {
+        end = nextNight(n)
+      } else {
+        bookings.push({ id: start === b.check_in ? b.id : `${b.id}-${start}`, check_in: start, check_out: end })
+        start = n
+        end = nextNight(n)
+      }
+    }
+    bookings.push({ id: start === b.check_in ? b.id : `${b.id}-${start}`, check_in: start, check_out: end })
+  }
 
   // DTSTAMP es obligatorio en cada evento según el estándar iCal; sin él
   // algunas plataformas tratan el calendario como inválido o sin cambios.
