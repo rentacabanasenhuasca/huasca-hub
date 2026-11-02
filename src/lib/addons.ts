@@ -5,6 +5,17 @@
 // getBookingQuote() ya usa para el precio de la estancia: nunca confiar en
 // un total que venga del cliente).
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { todayInMexicoStr } from '@/lib/dates'
+
+// Los extras solo se ofrecen si la llegada es con al menos esta anticipación
+// (en días): con menos tiempo no alcanza a prepararse (kit, decoración, etc.).
+export const ADDONS_MIN_DAYS_AHEAD = 2
+
+export function addonsAvailableFor(checkin: string): boolean {
+  const today = todayInMexicoStr()
+  const days = Math.round((Date.parse(`${checkin}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000)
+  return days >= ADDONS_MIN_DAYS_AHEAD
+}
 
 export type AddonSelection = { addonId: string; quantity: number }
 
@@ -25,9 +36,13 @@ export async function resolveAddons(
   supabase: SupabaseClient,
   hostId: string,
   propertyId: string,
-  selections: AddonSelection[]
+  selections: AddonSelection[],
+  // Si se pasa, no se cobra ningún extra cuando la llegada es con menos de
+  // ADDONS_MIN_DAYS_AHEAD días de anticipación (ver addonsAvailableFor).
+  options?: { checkin?: string }
 ): Promise<ResolvedAddons> {
   if (!selections || selections.length === 0) return { items: [], total: 0 }
+  if (options?.checkin && !addonsAvailableFor(options.checkin)) return { items: [], total: 0 }
 
   const ids = [...new Set(selections.map((s) => s.addonId).filter(Boolean))]
   if (ids.length === 0) return { items: [], total: 0 }
@@ -35,7 +50,7 @@ export async function resolveAddons(
   const [{ data: addons }, { data: restrictions }] = await Promise.all([
     supabase
       .from('addons')
-      .select('id, name, price_mxn, unit, max_quantity')
+      .select('id, name, price_mxn, unit, max_quantity, min_quantity')
       .eq('host_id', hostId)
       .eq('active', true)
       .in('id', ids),
@@ -69,7 +84,7 @@ export async function resolveAddons(
 
     const quantity =
       addon.unit === 'per_unit'
-        ? Math.min(Math.max(1, Math.round(sel.quantity || 1)), addon.max_quantity)
+        ? Math.min(Math.max(addon.min_quantity ?? 1, Math.round(sel.quantity || 1)), addon.max_quantity)
         : 1
 
     const unitPrice = Number(addon.price_mxn)
