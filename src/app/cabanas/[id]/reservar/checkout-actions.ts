@@ -85,7 +85,9 @@ export async function createStripePaymentIntent(params: CheckoutParams) {
   if (!quote.minNightsOk) return { error: `Estas fechas requieren mínimo ${quote.minNightsRequired} noches.` }
   if (quote.total <= 0) return { error: 'No se pudo calcular el precio de la reserva.' }
 
-  const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [])
+  const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [], {
+    checkin: params.checkin,
+  })
 
   let discountAmount = 0
   if (params.discountCode) {
@@ -223,7 +225,9 @@ async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
   if (!quote.minNightsOk) return { error: `Estas fechas requieren mínimo ${quote.minNightsRequired} noches.` }
   if (quote.total <= 0) return { error: 'No se pudo calcular el precio de la reserva.' }
 
-  const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [])
+  const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [], {
+    checkin: params.checkin,
+  })
 
   let mpDiscountAmount = 0
   if (params.discountCode) {

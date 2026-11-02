@@ -26,6 +26,7 @@ export type AddonOption = {
   price_mxn: number
   unit: 'flat' | 'per_unit'
   max_quantity: number
+  min_quantity: number
   photo_url: string | null
 }
 
@@ -258,6 +259,7 @@ export default function ReservarClient({
                     )}
                     <p className="text-xs text-stone mt-0.5">
                       ${addon.price_mxn.toLocaleString('es-MX')} MXN{addon.unit === 'per_unit' ? ' c/u' : ''}
+                      {addon.unit === 'per_unit' && addon.min_quantity > 1 ? ` · mínimo ${addon.min_quantity}` : ''}
                     </p>
                   </div>
                   {addon.unit === 'flat' ? (
@@ -276,7 +278,7 @@ export default function ReservarClient({
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
-                        onClick={() => setAddonQty(addon, qty - 1)}
+                        onClick={() => setAddonQty(addon, qty <= (addon.min_quantity ?? 1) ? 0 : qty - 1)}
                         disabled={qty === 0}
                         className="h-7 w-7 rounded-full border border-stone/25 text-navy-deep disabled:opacity-30"
                       >
@@ -285,7 +287,7 @@ export default function ReservarClient({
                       <span className="w-4 text-center text-sm text-navy-deep">{qty}</span>
                       <button
                         type="button"
-                        onClick={() => setAddonQty(addon, qty + 1)}
+                        onClick={() => setAddonQty(addon, qty === 0 ? Math.max(1, addon.min_quantity ?? 1) : qty + 1)}
                         disabled={qty >= addon.max_quantity}
                         className="h-7 w-7 rounded-full border border-stone/25 text-navy-deep disabled:opacity-30"
                       >

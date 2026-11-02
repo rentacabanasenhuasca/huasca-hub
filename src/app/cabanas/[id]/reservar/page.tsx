@@ -6,6 +6,7 @@ import { isUuid } from '@/lib/is-uuid'
 import { parseGuestsFromParams, guestsSummary } from '@/lib/occupancy'
 import { getBookingQuote, type QuoteProperty } from '@/lib/booking-quote'
 import ReservarClient from './ReservarClient'
+import { addonsAvailableFor } from '@/lib/addons'
 
 export default async function ReservarPage({
   params,
@@ -48,7 +49,7 @@ export default async function ReservarPage({
 
   const { data: allAddons } = await supabase
     .from('addons')
-    .select('id, name, description, price_mxn, unit, max_quantity, photo_url')
+    .select('id, name, description, price_mxn, unit, max_quantity, min_quantity, photo_url')
     .eq('host_id', property.host_id)
     .eq('active', true)
     .order('sort_order', { ascending: true })
@@ -68,10 +69,14 @@ export default async function ReservarPage({
     restrictedTo.get(r.addon_id)!.add(r.property_id)
   }
 
-  const addons = (allAddons ?? []).filter((a) => {
-    const allowed = restrictedTo.get(a.id)
-    return !allowed || allowed.has(property.id)
-  })
+  // Con menos de 2 días de anticipación no se ofrecen extras (no alcanzan
+  // a prepararse) — ver addonsAvailableFor en /lib/addons.ts.
+  const addons = !checkin || !addonsAvailableFor(checkin)
+    ? []
+    : (allAddons ?? []).filter((a) => {
+        const allowed = restrictedTo.get(a.id)
+        return !allowed || allowed.has(property.id)
+      })
 
   const guests = parseGuestsFromParams(sp)
 
