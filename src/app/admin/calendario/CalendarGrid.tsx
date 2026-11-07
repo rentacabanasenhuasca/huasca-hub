@@ -12,6 +12,7 @@ import {
   setMinGuestsOverride,
   setPriceOverride,
   getBookingDetails,
+  resendBookingEmails,
   cancelBooking,
   moveBooking,
   type Selection,
@@ -79,7 +80,7 @@ type BookingDetails = {
   discount_amount_mxn?: number | string | null
   coupon_type?: string | null
   coupon_value?: number | null
-  addons?: { name: string; quantity: number; unit_price_mxn: number; subtotal_mxn: number }[]
+  addons?: { name: string; quantity: number; unit_price_mxn: number; subtotal_mxn: number; answers?: { label: string; value: string }[] | null }[]
 }
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
@@ -107,6 +108,34 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
     <div>
       <dt className="text-xs text-stone">{label}</dt>
       <dd className="text-navy-deep">{children}</dd>
+    </div>
+  )
+}
+
+// Botón para volver a mandar los correos de la reserva (confirmación al
+// huésped, aviso para ti y avisos al equipo, según las plantillas activas).
+function ResendEmailsButton({ bookingId }: { bookingId: string }) {
+  const [pending, startTransition] = useTransition()
+  const [msg, setMsg] = useState<string | null>(null)
+  return (
+    <div className="border-t border-stone/10 pt-3">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (!window.confirm('¿Volver a mandar los correos de esta reserva (huésped, tú y equipo)?')) return
+          setMsg(null)
+          startTransition(async () => {
+            const res = await resendBookingEmails(bookingId)
+            if (res.error) setMsg(res.error)
+            else setMsg(`Se mandaron ${res.sent} correo(s).${res.errors.length ? ` Problemas: ${res.errors.join(' · ')}` : ''}`)
+          })
+        }}
+        className="rounded-lg border border-navy-deep/30 px-3 py-1.5 text-xs font-medium text-navy-deep hover:bg-navy-deep/5 transition disabled:opacity-50"
+      >
+        {pending ? 'Mandando…' : '✉️ Reenviar correos'}
+      </button>
+      {msg && <p className="mt-1.5 text-xs text-stone">{msg}</p>}
     </div>
   )
 }
@@ -195,11 +224,22 @@ function BookingInfo({ booking: b }: { booking: BookingDetails }) {
         ) : (
           <ul className="mt-0.5 space-y-0.5">
             {addons.map((a, i) => (
-              <li key={i} className="flex justify-between gap-3">
-                <span>
-                  {a.quantity} × {a.name}
-                </span>
-                <span className="tabular-nums">{money(a.subtotal_mxn)}</span>
+              <li key={i}>
+                <div className="flex justify-between gap-3">
+                  <span>
+                    {a.quantity} × {a.name}
+                  </span>
+                  <span className="tabular-nums">{money(a.subtotal_mxn)}</span>
+                </div>
+                {(a.answers ?? []).length > 0 && (
+                  <ul className="mt-0.5 mb-1 space-y-0.5 pl-3 text-xs text-stone">
+                    {(a.answers ?? []).map((ans, j) => (
+                      <li key={j}>
+                        <span className="font-medium text-navy-deep">{ans.label}:</span> {ans.value}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -259,6 +299,8 @@ function BookingInfo({ booking: b }: { booking: BookingDetails }) {
       <InfoRow label="Número de reserva">
         <span className="font-mono text-xs break-all">{b.id}</span>
       </InfoRow>
+
+      <ResendEmailsButton bookingId={b.id} />
     </dl>
   )
 }

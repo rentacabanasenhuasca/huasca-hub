@@ -141,7 +141,7 @@ export async function getBookingDetails(bookingId: string) {
   // Extras que el huésped contrató junto con la reserva (leña, kits, etc.).
   const { data: addons } = await supabase
     .from('booking_addons')
-    .select('name, quantity, unit_price_mxn, subtotal_mxn')
+    .select('name, quantity, unit_price_mxn, subtotal_mxn, answers')
     .eq('booking_id', bookingId)
     .order('created_at')
 
@@ -536,6 +536,29 @@ export async function setPriceOverride(selections: Selection[], priceMxn: number
 // Correos configurados (habilitados, disparador "booking_created") de una
 // cabaña — para que el modal de reserva manual pueda mostrarle al host
 // cuáles existen y dejarlo elegir cuáles mandar (o ninguno).
+// Vuelve a mandar los correos de una reserva que ya existe (huésped, tú y
+// avisos al equipo, según las plantillas activas de esa cabaña) — p. ej.
+// una reserva capturada a mano o un huésped que no recibió su confirmación.
+export async function resendBookingEmails(bookingId: string) {
+  const host = await requireHost()
+  const supabase = await createClient()
+
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, properties ( host_id )')
+    .eq('id', bookingId)
+    .maybeSingle()
+  const property = booking ? (Array.isArray(booking.properties) ? booking.properties[0] : booking.properties) : null
+  if (!booking || !property || property.host_id !== host.id) return { error: 'Esa reserva no existe.', sent: 0, errors: [] }
+
+  try {
+    const result = await sendBookingEmails(supabase, bookingId)
+    return { error: null, ...result }
+  } catch (err) {
+    return { error: `No se pudieron mandar: ${(err as Error).message}`, sent: 0, errors: [] }
+  }
+}
+
 export async function getBookingEmailTemplates(propertyId: string) {
   const host = await requireHost()
   const supabase = await createClient()
