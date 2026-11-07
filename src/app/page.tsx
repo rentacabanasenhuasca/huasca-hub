@@ -69,12 +69,12 @@ export default async function Home({
   const { data: properties } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale'
+      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale, hide_calendar'
     )
     .eq('status', 'published')
     .order('name')
 
-  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null; for_sale: boolean | null })[]
+  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null; for_sale: boolean | null; hide_calendar: boolean | null })[]
   const propertyIds = typedProperties.map((p) => p.id)
   // El anfitrión "real": el dueño de las propiedades publicadas. Sirve para
   // filtrar la portada (hero_media) — si por alguna razón llegara a existir
@@ -226,8 +226,10 @@ export default async function Home({
       if (property.booking_mode === 'whatsapp') {
         // Sin precio en línea, pero sí respetan las fechas ocupadas: si ya
         // está bloqueada en esas fechas, no aparece como disponible.
+        // Con el calendario escondido (aún no configurado) no se sabe: se
+        // muestra para que pregunten por WhatsApp.
         const taken = blockedByProperty.get(property.id)
-        const isFree = !nights.some((d) => taken?.has(d))
+        const isFree = property.hide_calendar ? true : !nights.some((d) => taken?.has(d))
         return { property, total: null as number | null, minNightsOk: true, minNightsRequired: 1, fitsGuests, isFree }
       }
 
@@ -468,7 +470,11 @@ export default async function Home({
                         </p>
                         {property.booking_mode === 'whatsapp' && (
                           <p className="text-xs text-[#128C7E] mt-1.5 font-medium">
-                            {hasSearch ? 'Disponible en tus fechas · se reserva por WhatsApp' : 'Se reserva por WhatsApp'}
+                            {hasSearch && !property.hide_calendar
+                              ? 'Disponible en tus fechas · se reserva por WhatsApp'
+                              : hasSearch
+                                ? 'Consulta disponibilidad por WhatsApp'
+                                : 'Se reserva por WhatsApp'}
                           </p>
                         )}
                       </div>
@@ -528,7 +534,7 @@ export default async function Home({
             <h2 className="font-display text-2xl sm:text-3xl text-navy-deep mb-5">Calendario de disponibilidad</h2>
             <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
               <PublicAvailabilityGrid
-                properties={typedProperties.map((p) => ({
+                properties={typedProperties.filter((p) => !p.hide_calendar).map((p) => ({
                   id: p.id,
                   slug: p.slug,
                   name: p.name,
