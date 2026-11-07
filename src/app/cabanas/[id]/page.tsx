@@ -137,7 +137,7 @@ export default async function CabanaPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale'
+      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale, hide_calendar'
     )
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
@@ -189,6 +189,9 @@ export default async function CabanaPage({
   // "Solo por WhatsApp": se anuncia pero no se cotiza ni se paga en línea;
   // el huésped pregunta disponibilidad por WhatsApp.
   const whatsappOnly = property.booking_mode === 'whatsapp'
+  // Calendario escondido (p. ej. aún no configurado): no se muestra la
+  // disponibilidad ni se tachan días en el selector de fechas.
+  const hideCalendar = Boolean((property as { hide_calendar?: boolean | null }).hide_calendar)
 
   let total: number | null = null
   let nights: string[] = []
@@ -352,6 +355,7 @@ export default async function CabanaPage({
 
             {/* Todas las cabañas muestran su disponibilidad sincronizada,
                 incluidas las que se reservan por WhatsApp. */}
+            {!hideCalendar && (
             <div id="disponibilidad" className="mt-8 pt-8 border-t border-stone/10 scroll-mt-40">
               <h2 className="font-display text-xl text-navy-deep mb-4">Disponibilidad</h2>
               {whatsappOnly && (
@@ -371,6 +375,7 @@ export default async function CabanaPage({
                 </Suspense>
               </div>
             </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-stone/10 text-sm text-stone space-y-1.5">
               <p>Estancia mínima: {property.min_nights} noche(s){property.max_nights ? ` · máxima ${property.max_nights}` : ''}</p>
@@ -408,7 +413,7 @@ export default async function CabanaPage({
               <DateRangePicker
                 defaultCheckin={checkin}
                 defaultCheckout={checkout}
-                blockedDates={(availabilityBlocked ?? []).map((b) => b.date)}
+                blockedDates={hideCalendar ? [] : (availabilityBlocked ?? []).map((b) => b.date)}
               />
               <label className="block">
                 <span className="block text-xs font-medium text-stone mb-1">Huéspedes</span>
