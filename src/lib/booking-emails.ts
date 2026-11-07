@@ -124,14 +124,18 @@ export async function sendBookingEmails(
 
   const { data: bookingAddons } = await supabase
     .from('booking_addons')
-    .select('name, unit_price_mxn, quantity, subtotal_mxn')
+    .select('name, unit_price_mxn, quantity, subtotal_mxn, answers')
     .eq('booking_id', bookingId)
 
   const addonsText = (bookingAddons ?? []).length
     ? (bookingAddons ?? [])
         .map(
           (a) =>
-            `- ${a.name}${a.quantity > 1 ? ` x${a.quantity}` : ''}: $${Number(a.subtotal_mxn).toLocaleString('es-MX')} MXN`
+            `- ${a.name}${a.quantity > 1 ? ` x${a.quantity}` : ''}: $${Number(a.subtotal_mxn).toLocaleString('es-MX')} MXN` +
+            // Respuestas del huésped (ej. mensaje del letrero, sabor de pizza).
+            ((a.answers as { label: string; value: string }[] | null) ?? [])
+              .map((ans) => `\n   • ${ans.label}: ${ans.value}`)
+              .join('')
         )
         .join('\n')
     : 'Ninguno'

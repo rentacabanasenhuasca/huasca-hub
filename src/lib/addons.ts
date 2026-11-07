@@ -17,7 +17,36 @@ export function addonsAvailableFor(checkin: string): boolean {
   return days >= ADDONS_MIN_DAYS_AHEAD
 }
 
-export type AddonSelection = { addonId: string; quantity: number }
+export type AddonQuestion = {
+  key: string
+  label: string
+  type: 'text' | 'select'
+  required?: boolean
+  maxLength?: number
+  placeholder?: string
+  options?: string[]
+}
+
+// Respuestas del huésped a las preguntas de un extra (ej. mensaje del
+// letrero, sabor de pizza), por key de la pregunta.
+export type AddonSelection = { addonId: string; quantity: number; answers?: Record<string, string> }
+
+export type AddonAnswer = { label: string; value: string }
+
+// Limpia las respuestas contra las preguntas reales del extra: solo las
+// preguntas que existen, texto recortado, y en las de opciones solo un valor
+// de la lista. Devuelve también qué preguntas obligatorias faltan.
+export function cleanAddonAnswers(questions: AddonQuestion[] | null | undefined, raw: Record<string, string> | undefined) {
+  const answers: AddonAnswer[] = []
+  const missing: string[] = []
+  for (const q of questions ?? []) {
+    let value = String(raw?.[q.key] ?? '').trim().slice(0, q.maxLength ?? 200)
+    if (q.type === 'select' && value && !(q.options ?? []).includes(value)) value = ''
+    if (value) answers.push({ label: q.label, value })
+    else if (q.required) missing.push(q.label)
+  }
+  return { answers, missing }
+}
 
 export type ResolvedAddonItem = {
   addon_id: string
@@ -25,11 +54,14 @@ export type ResolvedAddonItem = {
   unit_price_mxn: number
   quantity: number
   subtotal_mxn: number
+  answers: AddonAnswer[]
 }
 
 export type ResolvedAddons = {
   items: ResolvedAddonItem[]
   total: number
+  // Preguntas obligatorias sin contestar, por extra (ej. "Decoración: Sabor de tu pizza").
+  missing: string[]
 }
 
 export async function resolveAddons(
@@ -41,16 +73,16 @@ export async function resolveAddons(
   // ADDONS_MIN_DAYS_AHEAD días de anticipación (ver addonsAvailableFor).
   options?: { checkin?: string }
 ): Promise<ResolvedAddons> {
-  if (!selections || selections.length === 0) return { items: [], total: 0 }
-  if (options?.checkin && !addonsAvailableFor(options.checkin)) return { items: [], total: 0 }
+  if (!selections || selections.length === 0) return { items: [], total: 0, missing: [] }
+  if (options?.checkin && !addonsAvailableFor(options.checkin)) return { items: [], total: 0, missing: [] }
 
   const ids = [...new Set(selections.map((s) => s.addonId).filter(Boolean))]
-  if (ids.length === 0) return { items: [], total: 0 }
+  if (ids.length === 0) return { items: [], total: 0, missing: [] }
 
   const [{ data: addons }, { data: restrictions }] = await Promise.all([
     supabase
       .from('addons')
-      .select('id, name, price_mxn, unit, max_quantity, min_quantity')
+      .select('id, name, price_mxn, unit, max_quantity, min_quantity, questions')
       .eq('host_id', hostId)
       .eq('active', true)
       .in('id', ids),
@@ -78,6 +110,7 @@ export async function resolveAddons(
   )
 
   const items: ResolvedAddonItem[] = []
+  const missing: string[] = []
   for (const sel of selections) {
     const addon = byId.get(sel.addonId)
     if (!addon) continue // Extra ya no existe o se desactivó — se ignora, no se cobra.
@@ -88,15 +121,18 @@ export async function resolveAddons(
         : 1
 
     const unitPrice = Number(addon.price_mxn)
+    const cleaned = cleanAddonAnswers(addon.questions as AddonQuestion[] | null, sel.answers)
+    for (const m of cleaned.missing) missing.push(`${addon.name}: ${m}`)
     items.push({
       addon_id: addon.id,
       name: addon.name,
       unit_price_mxn: unitPrice,
       quantity,
       subtotal_mxn: Math.round(unitPrice * quantity * 100) / 100,
+      answers: cleaned.answers,
     })
   }
 
   const total = items.reduce((sum, it) => sum + it.subtotal_mxn, 0)
-  return { items, total: Math.round(total * 100) / 100 }
+  return { items, total: Math.round(total * 100) / 100, missing }
 }
