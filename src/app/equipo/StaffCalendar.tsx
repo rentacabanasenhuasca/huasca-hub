@@ -7,7 +7,9 @@ import { staffSetBlock } from './actions'
 // Cuántos meses se muestran a la vez (todo el horizonte cargado: ~13 meses).
 const MONTHS_SHOWN = 13
 
-export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string }
+// tag: texto corto que se ve dentro del día (quién bloqueó o "Reserva"); solo
+// en reservas y bloqueos manuales. label: el detalle completo al tocar el día.
+export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string; tag?: string }
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
@@ -35,7 +37,7 @@ function monthDays(start: Date) {
 const STYLE: Record<'free' | DayInfo['kind'], string> = {
   free: 'bg-white text-navy-deep border-stone/15 hover:border-gold',
   manual: 'bg-stone/25 text-navy-deep border-stone/30 hover:border-gold',
-  booking: 'bg-navy text-cream border-navy cursor-not-allowed',
+  booking: 'bg-navy text-cream border-navy',
   external: 'bg-burnt-orange/20 text-burnt-orange border-burnt-orange/30 cursor-not-allowed',
 }
 
@@ -54,6 +56,8 @@ export default function StaffCalendar({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  // Último día ocupado que se tocó, para mostrar quién/qué lo bloqueó.
+  const [focused, setFocused] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   const months = useMemo(() => Array.from({ length: MONTHS_SHOWN }, (_, i) => monthStart(today, i)), [today])
@@ -64,6 +68,7 @@ export default function StaffCalendar({
 
   function toggle(date: string) {
     const info = days[date]
+    setFocused(info && info.kind !== 'external' ? date : null)
     if (!canBlock || date < today || (info && info.kind !== 'manual')) return
     setMessage(null)
     setSelected((prev) => {
@@ -120,7 +125,12 @@ export default function StaffCalendar({
                       past ? 'bg-white text-stone/40 border-transparent' : STYLE[info?.kind ?? 'free']
                     } ${isSel ? 'ring-2 ring-gold ring-offset-1' : ''}`}
                   >
-                    {Number(d.slice(8))}
+                    <span className="block leading-none">{Number(d.slice(8))}</span>
+                    {!past && info?.tag && (
+                      <span className="mt-0.5 block truncate px-0.5 text-[8px] leading-tight opacity-80 sm:text-[9px]">
+                        {info.tag}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -191,6 +201,20 @@ export default function StaffCalendar({
             </button>
           </div>
         </div>
+      )}
+      {focused && days[focused] && (
+        <p className="mt-3 rounded-lg bg-cream px-3 py-2 text-sm text-navy-deep">
+          <span className="font-medium capitalize">
+            {new Date(`${focused}T12:00:00Z`).toLocaleDateString('es-MX', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              timeZone: 'UTC',
+            })}
+            :
+          </span>{' '}
+          {days[focused].label}
+        </p>
       )}
       {message && <p className="mt-3 text-sm text-stone">{message}</p>}
     </div>

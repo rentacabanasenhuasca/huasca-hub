@@ -71,6 +71,11 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         }),
   ])
 
+  // Nombre del huésped de cada reserva (solo si este colaborador puede ver
+  // reservas), para mostrar de quién es el bloqueo.
+  const guestByBooking = new Map<string, string>()
+  for (const b of bookings ?? []) if (b.guest_name) guestByBooking.set(b.id, b.guest_name)
+
   const days: Record<string, DayInfo> = {}
   for (const row of blocked ?? []) {
     const src = Array.isArray(row.ical_sources) ? row.ical_sources[0] : row.ical_sources
@@ -78,8 +83,16 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
       days[row.date] = {
         kind: 'manual',
         label: `Bloqueado${row.blocked_by ? ` por ${row.blocked_by}` : ' por el anfitrión'}${row.note ? ` — ${row.note}` : ''}`,
+        tag: row.blocked_by ? row.blocked_by.split(' ')[0] : 'Anfitrión',
       }
-    else if (row.source === 'booking') days[row.date] = { kind: 'booking', label: 'Reservado' }
+    else if (row.source === 'booking') {
+      const guest = row.booking_id ? guestByBooking.get(row.booking_id) : undefined
+      days[row.date] = {
+        kind: 'booking',
+        label: guest ? `Reserva en el sitio — ${guest}` : 'Reserva en el sitio',
+        tag: 'Reserva',
+      }
+    }
     else days[row.date] = { kind: 'external', label: `Ocupado en ${src?.label ?? src?.platform ?? 'otra plataforma'}` }
   }
 
