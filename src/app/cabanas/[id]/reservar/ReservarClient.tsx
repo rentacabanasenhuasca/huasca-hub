@@ -19,6 +19,8 @@ type Provider = 'stripe' | 'mercadopago'
 // cambiar a true.
 const MERCADOPAGO_ENABLED = false
 
+import type { AddonQuestion } from '@/lib/addons'
+
 export type AddonOption = {
   id: string
   name: string
@@ -28,6 +30,8 @@ export type AddonOption = {
   max_quantity: number
   min_quantity: number
   photo_url: string | null
+  questions: AddonQuestion[] | null
+  notice: string | null
 }
 
 export default function ReservarClient({
@@ -68,6 +72,8 @@ export default function ReservarClient({
   // que el huésped vea el total mientras elige; el que realmente se cobra
   // se vuelve a calcular en el servidor a partir del catálogo real.
   const [addonQuantities, setAddonQuantities] = useState<Record<string, number>>({})
+  // Respuestas a las preguntas de cada extra (ej. mensaje del letrero).
+  const [addonAnswers, setAddonAnswers] = useState<Record<string, Record<string, string>>>({})
 
   // Cupón de descuento: el huésped escribe un código y lo valida antes de
   // pagar (solo para mostrar el total con descuento) — el monto real
@@ -101,8 +107,21 @@ export default function ReservarClient({
     () =>
       Object.entries(addonQuantities)
         .filter(([, qty]) => qty > 0)
-        .map(([addonId, quantity]) => ({ addonId, quantity })),
-    [addonQuantities]
+        .map(([addonId, quantity]) => ({ addonId, quantity, answers: addonAnswers[addonId] ?? {} })),
+    [addonQuantities, addonAnswers]
+  )
+
+  // Preguntas obligatorias de los extras elegidos que faltan por contestar.
+  const missingAddonAnswers = useMemo(
+    () =>
+      addons
+        .filter((a) => (addonQuantities[a.id] ?? 0) > 0)
+        .flatMap((a) =>
+          (a.questions ?? [])
+            .filter((q) => q.required && !(addonAnswers[a.id]?.[q.key] ?? '').trim())
+            .map((q) => `${a.name}: ${q.label}`)
+        ),
+    [addons, addonQuantities, addonAnswers]
   )
 
   const addonsTotal = useMemo(
@@ -242,10 +261,8 @@ export default function ReservarClient({
             {addons.map((addon) => {
               const qty = addonQuantities[addon.id] ?? 0
               return (
-                <div
-                  key={addon.id}
-                  className="flex items-center gap-3 rounded-xl border border-stone/20 p-3"
-                >
+                <div key={addon.id} className="rounded-xl border border-stone/20 p-3">
+                  <div className="flex items-center gap-3">
                   {addon.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={addon.photo_url} alt="" className="h-12 w-12 rounded-lg object-cover shrink-0" />
@@ -293,6 +310,50 @@ export default function ReservarClient({
                       >
                         +
                       </button>
+                    </div>
+                  )}
+                  </div>
+                  {qty > 0 && (addon.notice || (addon.questions ?? []).length > 0) && (
+                    <div className="mt-3 space-y-2.5 border-t border-stone/10 pt-3">
+                      {addon.notice && (
+                        <p className="rounded-lg bg-gold/10 px-3 py-2 text-xs text-navy-deep">⚠️ {addon.notice}</p>
+                      )}
+                      {(addon.questions ?? []).map((q) => {
+                        const value = addonAnswers[addon.id]?.[q.key] ?? ''
+                        const setValue = (v: string) =>
+                          setAddonAnswers((prev) => ({ ...prev, [addon.id]: { ...(prev[addon.id] ?? {}), [q.key]: v } }))
+                        return (
+                          <label key={q.key} className="block">
+                            <span className="block text-xs font-medium text-navy-deep mb-1">
+                              {q.label}
+                              {q.required && <span className="text-burnt-orange"> *</span>}
+                            </span>
+                            {q.type === 'select' ? (
+                              <select
+                                value={value}
+                                onChange={(e) => setValue(e.target.value)}
+                                className="w-full rounded-xl border border-stone/25 bg-white px-3 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
+                              >
+                                <option value="">Elige una opción…</option>
+                                {(q.options ?? []).map((o) => (
+                                  <option key={o} value={o}>
+                                    {o}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={value}
+                                maxLength={q.maxLength ?? 200}
+                                placeholder={q.placeholder}
+                                onChange={(e) => setValue(e.target.value)}
+                                className="w-full rounded-xl border border-stone/25 px-3 py-2 text-sm text-navy-deep focus:outline-none focus:ring-2 focus:ring-gold/50"
+                              />
+                            )}
+                          </label>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -384,11 +445,16 @@ export default function ReservarClient({
               saveCartAction(cartPayload())
               setConfirmed(true)
             }}
-            disabled={!infoComplete}
+            disabled={!infoComplete || missingAddonAnswers.length > 0}
             className="w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition disabled:opacity-40"
           >
             Continuar al pago
           </button>
+          {missingAddonAnswers.length > 0 && (
+            <p className="text-xs text-burnt-orange text-center">
+              Completa los datos de tu extra arriba — falta: {missingAddonAnswers[0].split(': ').slice(1).join(': ')}
+            </p>
+          )}
           <p className="text-[11px] text-stone text-center">
             Guardamos tus datos solo para dar seguimiento a tu reserva.
           </p>

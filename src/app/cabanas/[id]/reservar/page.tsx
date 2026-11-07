@@ -49,7 +49,7 @@ export default async function ReservarPage({
 
   const { data: allAddons } = await supabase
     .from('addons')
-    .select('id, name, description, price_mxn, unit, max_quantity, min_quantity, photo_url')
+    .select('id, name, description, price_mxn, unit, max_quantity, min_quantity, photo_url, questions, notice')
     .eq('host_id', property.host_id)
     .eq('active', true)
     .order('sort_order', { ascending: true })

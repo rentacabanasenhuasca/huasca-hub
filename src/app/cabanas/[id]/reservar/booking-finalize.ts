@@ -163,6 +163,7 @@ export async function finalizeBooking(
         unit_price_mxn: item.unit_price_mxn,
         quantity: item.quantity,
         subtotal_mxn: item.subtotal_mxn,
+        answers: item.answers && item.answers.length > 0 ? item.answers : null,
       }))
     )
     if (addonsError) console.warn('[booking-addons]', addonsError.message)

@@ -88,6 +88,7 @@ export async function createStripePaymentIntent(params: CheckoutParams) {
   const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [], {
     checkin: params.checkin,
   })
+  if (addons.missing.length > 0) return { error: `Falta completar los datos del extra — ${addons.missing[0]}.` }
 
   let discountAmount = 0
   if (params.discountCode) {
@@ -228,6 +229,7 @@ async function createMercadoPagoPaymentInner(params: MercadoPagoParams) {
   const addons = await resolveAddons(supabase, property.host_id, params.propertyId, params.addonSelections ?? [], {
     checkin: params.checkin,
   })
+  if (addons.missing.length > 0) return { error: `Falta completar los datos del extra — ${addons.missing[0]}.` }
 
   let mpDiscountAmount = 0
   if (params.discountCode) {
