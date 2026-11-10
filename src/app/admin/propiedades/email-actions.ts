@@ -151,7 +151,8 @@ export async function seedDefaultEmailTemplates(propertyId: string) {
         'Huéspedes: {{adults}} adultos, {{children}} niños, {{infants}} infantes, mascotas: {{pets}}\n' +
         'Total: {{total}} · Pagado con: {{payment_provider}}\n' +
         'Notas del huésped: {{guest_notes}}\n' +
-        'ID de reserva: {{booking_id}}',
+        'ID de reserva: {{booking_id}}\n\n' +
+        '{{guest_whatsapp_button}}',
     },
   ])
 
