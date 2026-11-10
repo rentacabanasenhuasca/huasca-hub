@@ -9,6 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { LOGO_CID, LOGO_PNG_BASE64 } from '@/lib/email-logo'
 import { EMAIL_PLACEHOLDERS } from '@/lib/email-placeholders'
+import { whatsappDigits } from '@/lib/sale-listings'
 
 // Se re-exporta desde aquí para no romper nada que ya importara
 // EMAIL_PLACEHOLDERS de este archivo — pero el dato real vive en
@@ -90,6 +91,30 @@ function renderSubject(text: string, data: Record<string, string>) {
   return renderPlaceholders(text, data)
 }
 
+// Botón verde de WhatsApp para escribirle al huésped (abre el chat con su
+// número y un saludo listo). Vacío si la reserva no trae teléfono.
+function whatsappButtonHtml(phone: string, guestName: string, propertyName: string, checkIn: string) {
+  const digits = whatsappDigits(phone)
+  if (!digits) return ''
+  const firstName = guestName.trim().split(/\s+/)[0] ?? ''
+  const text = `Hola ${firstName}, te escribimos de Huasca Retreats sobre tu reserva en ${propertyName} (llegada ${checkIn}).`
+  const href = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+  return (
+    `<a href="${href}" target="_blank" rel="noopener" ` +
+    `style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;font-weight:600;` +
+    `padding:12px 22px;border-radius:999px;font-size:15px;">💬 Escribir por WhatsApp al huésped</a>`
+  )
+}
+
+// El correo del administrador siempre lleva el botón de WhatsApp al final
+// (en todas las cabañas, también las que se creen después), a menos que la
+// plantilla ya lo coloque en otro lugar con {{guest_whatsapp_button}}.
+function withWhatsappButton(template: { recipient_type: string; body: string }, button: string) {
+  if (template.recipient_type !== 'admin' || !button) return template.body
+  if (/\{\{\s*guest_whatsapp_button\s*\}\}/.test(template.body)) return template.body
+  return `${template.body.trimEnd()}\n\n{{guest_whatsapp_button}}`
+}
+
 // Para el cuerpo: el host escribe texto plano en el panel, así que lo
 // convertimos a párrafos con buen espaciado en vez de una sola línea con
 // <br> — se ve mucho más cuidado dentro de la tarjeta de marca.
@@ -104,7 +129,10 @@ function renderBodyHtml(text: string, data: Record<string, string>) {
 export async function sendBookingEmails(
   supabase: SupabaseClient,
   bookingId: string,
-  templateIds?: string[]
+  templateIds?: string[],
+  // Si se manda, todos los correos van solo a estas direcciones (reenvío a
+  // alguien en particular) en vez de a su destinatario configurado.
+  overrideTo?: string[]
 ) {
   const { data: booking } = await supabase
     .from('bookings')
@@ -172,7 +200,11 @@ export async function sendBookingEmails(
     host_email: host?.email ?? '',
     host_phone: host?.phone ?? '',
     addons: addonsText,
+    guest_whatsapp_link: whatsappDigits(booking.guest_phone) ? `https://wa.me/${whatsappDigits(booking.guest_phone)}` : '',
   }
+  // Solo para el cuerpo (HTML): el asunto es texto plano.
+  const whatsappButton = whatsappButtonHtml(data.guest_phone, data.guest_name, data.property_name, data.check_in)
+  const bodyData = { ...data, guest_whatsapp_button: whatsappButton }
 
   // templateIds: si se manda, restringe el envío a solo esos correos (ej.
   // una reserva manual donde el host eligió a mano cuáles mandar) — si no
@@ -202,6 +234,8 @@ export async function sendBookingEmails(
         .filter(Boolean)
     }
 
+    if (overrideTo && overrideTo.length > 0) recipients = overrideTo
+
     if (recipients.length === 0) {
       errors.push(`"${template.subject}" no se mandó: no hay ningún correo destinatario.`)
       continue
@@ -210,7 +244,7 @@ export async function sendBookingEmails(
     const result = await sendEmail({
       to: recipients,
       subject: renderSubject(template.subject, data),
-      html: wrapBrandedEmail(renderBodyHtml(template.body, data)),
+      html: wrapBrandedEmail(renderBodyHtml(withWhatsappButton(template, whatsappButton), bodyData)),
       attachments: [
         {
           filename: 'huasca-retreats.png',

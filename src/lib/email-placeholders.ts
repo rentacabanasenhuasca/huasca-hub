@@ -27,4 +27,6 @@ export const EMAIL_PLACEHOLDERS: { key: string; label: string }[] = [
   { key: 'host_email', label: 'Tu correo' },
   { key: 'host_phone', label: 'Tu teléfono' },
   { key: 'addons', label: 'Extras contratados por el huésped' },
+  { key: 'guest_whatsapp_button', label: 'Botón de WhatsApp al huésped' },
+  { key: 'guest_whatsapp_link', label: 'Liga de WhatsApp al huésped' },
 ]
