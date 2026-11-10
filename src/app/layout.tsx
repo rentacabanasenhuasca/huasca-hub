@@ -4,6 +4,7 @@ import "./globals.css";
 import { createServiceClient } from "@/lib/supabase/service";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import MetaPixel from "@/components/MetaPixel";
+import SiteAnalytics from "@/components/SiteAnalytics";
 import NavigationProgress from "@/components/NavigationProgress";
 import { Suspense } from "react";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, CORE_KEYWORDS } from "@/lib/site";
@@ -83,6 +84,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`h-full antialiased ${fraunces.variable} ${plusJakarta.variable}`}>
       <body className="min-h-full flex flex-col">
         <MetaPixel />
+        <SiteAnalytics />
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
