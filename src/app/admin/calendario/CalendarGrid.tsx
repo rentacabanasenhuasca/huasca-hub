@@ -13,6 +13,7 @@ import {
   setPriceOverride,
   getBookingDetails,
   resendBookingEmails,
+  getResendOptions,
   cancelBooking,
   moveBooking,
   type Selection,
@@ -116,25 +117,111 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 // huésped, aviso para ti y avisos al equipo, según las plantillas activas).
 function ResendEmailsButton({ bookingId }: { bookingId: string }) {
   const [pending, startTransition] = useTransition()
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [options, setOptions] = useState<{ id: string; name: string; to: string }[]>([])
+  const [chosen, setChosen] = useState<Set<string>>(new Set())
+  const [other, setOther] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
+
+  async function openPanel() {
+    setMsg(null)
+    setOpen(true)
+    setLoading(true)
+    const res = await getResendOptions(bookingId)
+    setLoading(false)
+    if (res.error) return setMsg(res.error)
+    setOptions(res.templates)
+    setChosen(new Set(res.templates.map((t) => t.id)))
+  }
+
+  function toggle(id: string) {
+    setChosen((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const otherList = other.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean)
+
   return (
     <div className="border-t border-stone/10 pt-3">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => {
-          if (!window.confirm('¿Volver a mandar los correos de esta reserva (huésped, tú y equipo)?')) return
-          setMsg(null)
-          startTransition(async () => {
-            const res = await resendBookingEmails(bookingId)
-            if (res.error) setMsg(res.error)
-            else setMsg(`Se mandaron ${res.sent} correo(s).${res.errors.length ? ` Problemas: ${res.errors.join(' · ')}` : ''}`)
-          })
-        }}
-        className="rounded-lg border border-navy-deep/30 px-3 py-1.5 text-xs font-medium text-navy-deep hover:bg-navy-deep/5 transition disabled:opacity-50"
-      >
-        {pending ? 'Mandando…' : '✉️ Reenviar correos'}
-      </button>
+      {!open ? (
+        <button
+          type="button"
+          onClick={openPanel}
+          className="rounded-lg border border-navy-deep/30 px-3 py-1.5 text-xs font-medium text-navy-deep hover:bg-navy-deep/5 transition"
+        >
+          ✉️ Reenviar correos
+        </button>
+      ) : (
+        <div className="rounded-xl border border-stone/20 bg-cream/40 p-3 space-y-2.5">
+          <p className="text-xs font-medium text-navy-deep">¿Qué correos quieres reenviar?</p>
+          {loading ? (
+            <p className="text-xs text-stone">Cargando…</p>
+          ) : options.length === 0 ? (
+            <p className="text-xs text-stone">Esta cabaña no tiene correos activos.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {options.map((t) => (
+                <li key={t.id}>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" className="mt-0.5" checked={chosen.has(t.id)} onChange={() => toggle(t.id)} />
+                    <span>
+                      <span className="font-medium text-navy-deep">{t.name}</span>
+                      <span className="block text-stone">
+                        Para: {otherList.length ? <s>{t.to}</s> : t.to}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div>
+            <label className="block text-[11px] text-stone mb-1">
+              Mandar a otro correo (opcional — si lo llenas, solo le llega a este)
+            </label>
+            <input
+              type="text"
+              inputMode="email"
+              value={other}
+              onChange={(e) => setOther(e.target.value)}
+              placeholder="correo@ejemplo.com"
+              className="w-full rounded-lg border border-stone/25 bg-white px-2.5 py-1.5 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={pending || loading || chosen.size === 0}
+              onClick={() => {
+                setMsg(null)
+                startTransition(async () => {
+                  const res = await resendBookingEmails(bookingId, {
+                    templateIds: [...chosen],
+                    to: otherList,
+                  })
+                  if (res.error) setMsg(res.error)
+                  else {
+                    setMsg(`Se mandaron ${res.sent} correo(s).${res.errors.length ? ` Problemas: ${res.errors.join(' · ')}` : ''}`)
+                    setOpen(false)
+                    setOther('')
+                  }
+                })
+              }}
+              className="rounded-lg bg-navy-deep px-3 py-1.5 text-xs font-medium text-cream hover:bg-navy-deep/90 transition disabled:opacity-50"
+            >
+              {pending ? 'Mandando…' : `Mandar ${chosen.size} correo(s)`}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="text-xs text-stone underline underline-offset-2">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
       {msg && <p className="mt-1.5 text-xs text-stone">{msg}</p>}
     </div>
   )

@@ -539,7 +539,10 @@ export async function setPriceOverride(selections: Selection[], priceMxn: number
 // Vuelve a mandar los correos de una reserva que ya existe (huésped, tú y
 // avisos al equipo, según las plantillas activas de esa cabaña) — p. ej.
 // una reserva capturada a mano o un huésped que no recibió su confirmación.
-export async function resendBookingEmails(bookingId: string) {
+// Reenvía los correos de una reserva. templateIds: cuáles mandar (si no se
+// manda, todos los habilitados). to: si trae correos, los correos elegidos se
+// mandan SOLO a esas direcciones en vez de a sus destinatarios de siempre.
+export async function resendBookingEmails(bookingId: string, opts?: { templateIds?: string[]; to?: string[] }) {
   const host = await requireHost()
   const supabase = await createClient()
 
@@ -551,11 +554,55 @@ export async function resendBookingEmails(bookingId: string) {
   const property = booking ? (Array.isArray(booking.properties) ? booking.properties[0] : booking.properties) : null
   if (!booking || !property || property.host_id !== host.id) return { error: 'Esa reserva no existe.', sent: 0, errors: [] }
 
+  if (opts?.templateIds && opts.templateIds.length === 0) return { error: 'Elige al menos un correo.', sent: 0, errors: [] }
+  const to = (opts?.to ?? []).map((e) => e.trim()).filter(Boolean)
+  const bad = to.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  if (bad) return { error: `"${bad}" no parece un correo válido.`, sent: 0, errors: [] }
+
   try {
-    const result = await sendBookingEmails(supabase, bookingId)
+    const result = await sendBookingEmails(supabase, bookingId, opts?.templateIds, to.length ? to : undefined)
     return { error: null, ...result }
   } catch (err) {
     return { error: `No se pudieron mandar: ${(err as Error).message}`, sent: 0, errors: [] }
+  }
+}
+
+// Los correos configurados de la cabaña de una reserva, con a quién le llega
+// cada uno — para elegir cuáles reenviar.
+export async function getResendOptions(bookingId: string) {
+  const host = await requireHost()
+  const supabase = await createClient()
+
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, guest_email, property_id, properties ( host_id, hosts ( email ) )')
+    .eq('id', bookingId)
+    .maybeSingle()
+  const property = booking ? (Array.isArray(booking.properties) ? booking.properties[0] : booking.properties) : null
+  if (!booking || !property || property.host_id !== host.id) return { error: 'Esa reserva no existe.', templates: [] }
+  const hostRow = Array.isArray(property.hosts) ? property.hosts[0] : property.hosts
+
+  const { data: templates, error } = await supabase
+    .from('email_templates')
+    .select('id, name, recipient_type, recipient_emails')
+    .eq('property_id', booking.property_id)
+    .eq('trigger_event', 'booking_created')
+    .eq('enabled', true)
+    .order('created_at', { ascending: true })
+  if (error) return { error: `No se pudieron cargar los correos: ${error.message}`, templates: [] }
+
+  return {
+    error: null,
+    templates: (templates ?? []).map((t) => ({
+      id: t.id as string,
+      name: t.name as string,
+      to:
+        t.recipient_type === 'guest'
+          ? `Huésped${booking.guest_email ? ` (${booking.guest_email})` : ' (sin correo)'}`
+          : t.recipient_type === 'admin'
+            ? `Tú${hostRow?.email ? ` (${hostRow.email})` : ''}`
+            : (t.recipient_emails as string | null) || 'Sin destinatario',
+    })),
   }
 }
 
