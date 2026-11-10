@@ -38,4 +38,11 @@ export async function register() {
   setInterval(() => {
     processAbandonedCarts().catch((err) => console.warn('[carritos]', (err as Error).message))
   }, 5 * 60 * 1000)
+
+  // Correos de reservas creadas directo en Supabase (emails_pending = true):
+  // cada minuto manda los pendientes (ver src/lib/pending-booking-emails.ts).
+  const { processPendingBookingEmails } = await import('@/lib/pending-booking-emails')
+  setInterval(() => {
+    processPendingBookingEmails().catch((err) => console.warn('[correos-pendientes]', (err as Error).message))
+  }, 60 * 1000)
 }
