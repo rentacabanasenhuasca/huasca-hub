@@ -18,6 +18,7 @@ function readPermissions(formData: FormData) {
     can_block_dates: formData.get('can_block_dates') === 'on',
     can_view_bookings: formData.get('can_view_bookings') === 'on',
     can_view_guest_contact: formData.get('can_view_guest_contact') === 'on',
+    can_manage_team: formData.get('can_manage_team') === 'on',
   }
 }
 
@@ -134,6 +135,9 @@ export async function deleteStaff(staffId: string): Promise<Result> {
   if (!own) return { error: 'No se encontró el colaborador.' }
   // Borrar la cuenta de Auth borra en cascada su fila y sus accesos. Los
   // bloqueos de fechas que haya hecho se quedan (son del calendario).
+  // Si tenía su propio equipo, también se les quita el acceso a ellos.
+  const { data: team } = await own.service.from('staff_members').select('user_id').eq('created_by_staff_id', staffId)
+  for (const m of team ?? []) await own.service.auth.admin.deleteUser(m.user_id)
   const { error } = await own.service.auth.admin.deleteUser(own.staff.user_id)
   if (error) return { error: `No se pudo eliminar: ${error.message}` }
   revalidatePath('/admin/equipo')
