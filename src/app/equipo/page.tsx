@@ -1,5 +1,9 @@
 import Link from 'next/link'
-import { requireStaff } from '@/lib/staff'
+import { requireStaff, staffOwnerKey } from '@/lib/staff'
+import { STAY_COLUMNS, stayLines, mxn, waLink, type ManualStay } from '@/lib/manual-stays'
+import { SITE_URL } from '@/lib/site'
+import IcalPanel from '@/app/socios/(panel)/cabana/IcalPanel'
+import { staffAddIcal, staffDeleteIcal } from './actions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import StaffCalendar, { type DayInfo } from './StaffCalendar'
@@ -38,10 +42,15 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const until = addDays(today, 400)
   const service = createServiceClient()
 
-  const [{ data: blocked }, { data: bookings }] = await Promise.all([
+  // Datos de huéspedes de reservas por fuera: solo los de su grupo (él, su
+  // jefe y su equipo), salvo que el anfitrión le haya dado "Ver reservas".
+  let staysQuery = service.from('manual_stays').select(STAY_COLUMNS).eq('property_id', property.id).gte('check_out', today)
+  if (!staff.can_view_bookings) staysQuery = staysQuery.eq('owner_key', staffOwnerKey(staff))
+
+  const [{ data: blocked }, { data: bookings }, { data: staysData }, { data: icalSources }] = await Promise.all([
     service
       .from('blocked_dates')
-      .select('date, source, note, blocked_by, booking_id, ical_sources(platform, label)')
+      .select('date, source, note, blocked_by, booking_id, stay_id, ical_sources(platform, label)')
       .eq('property_id', property.id)
       .gte('date', today)
       .lt('date', until),
@@ -69,7 +78,17 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
             source: string
           }[],
         }),
+    staysQuery.order('check_in'),
+    staff.can_block_dates
+      ? service
+          .from('ical_sources')
+          .select('id, label, platform, last_synced_at, last_sync_status, added_by_staff_id')
+          .eq('property_id', property.id)
+          .order('created_at')
+      : Promise.resolve({ data: [] as never[] }),
   ])
+  const stays = (staysData ?? []) as ManualStay[]
+  const stayById = new Map(stays.map((st) => [st.id, st]))
 
   // Nombre del huésped de cada reserva (solo si este colaborador puede ver
   // reservas), para mostrar de quién es el bloqueo.
@@ -79,7 +98,16 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const days: Record<string, DayInfo> = {}
   for (const row of blocked ?? []) {
     const src = Array.isArray(row.ical_sources) ? row.ical_sources[0] : row.ical_sources
-    if (row.source === 'manual')
+    const stay = row.stay_id ? stayById.get(row.stay_id) : undefined
+    if (row.source === 'manual' && stay)
+      days[row.date] = {
+        kind: 'manual',
+        label: `Reserva por fuera — ${stay.guest_name}${row.note ? ` (${row.note})` : ''}`,
+        tag: stay.guest_name.split(' ')[0],
+        details: stayLines(stay),
+        phone: stay.guest_phone,
+      }
+    else if (row.source === 'manual')
       days[row.date] = {
         kind: 'manual',
         label: `Bloqueado${row.blocked_by ? ` por ${row.blocked_by}` : ' por el anfitrión'}${row.note ? ` — ${row.note}` : ''}`,
@@ -120,7 +148,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         <h1 className="text-xl font-semibold text-navy-deep">{property.name}</h1>
         <p className="text-sm text-stone mt-1">
           {staff.can_block_dates
-            ? 'Toca los días para seleccionarlos y luego elige Bloquear o Desbloquear. Los bloqueos se pasan solos a Airbnb (puede tardar unas horas en reflejarse allá).'
+            ? 'Toca los días para seleccionarlos y luego elige Bloquear o Desbloquear. Si es una reserva por fuera, marca "Es una reserva" y anota los datos del huésped: los verás al tocar el día. Los bloqueos se pasan solos a Airbnb/Booking (puede tardar unas horas en reflejarse allá).'
             : 'Aquí puedes ver qué días están libres y cuáles ocupados.'}
         </p>
       </div>
@@ -131,6 +159,50 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         days={days}
         canBlock={staff.can_block_dates}
       />
+
+      {stays.length > 0 && (
+        <section className="rounded-2xl border border-stone/15 bg-white p-4 sm:p-5">
+          <h2 className="font-medium text-navy-deep mb-3">Reservas por fuera (las que anotaron tú o tu equipo)</h2>
+          <ul className="divide-y divide-stone/10">
+            {stays.map((st) => (
+              <li key={st.id} className="py-2.5 text-sm">
+                <p className="text-navy-deep font-medium">
+                  {shortDate(st.check_in)} → {shortDate(st.check_out)} · {st.guest_name}
+                  {st.guests ? ` · ${st.guests} persona(s)` : ''}
+                </p>
+                <p className="text-stone">
+                  {[st.amount_mxn ? mxn(st.amount_mxn) : null, st.channel, st.notes, `anotó ${st.created_by}`]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {st.guest_phone && (
+                  <a href={waLink(st.guest_phone)} target="_blank" rel="noreferrer" className="text-xs text-[#128C7E] underline underline-offset-2">
+                    WhatsApp {st.guest_phone}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {staff.can_block_dates && (
+        <IcalPanel
+          propertyId={property.id}
+          exportUrl={`${SITE_URL}/api/ical/${property.id}`}
+          sources={(icalSources ?? []).map((src) => ({
+            id: src.id as string,
+            label: src.label as string,
+            platform: src.platform as string,
+            last_synced_at: src.last_synced_at as string | null,
+            last_sync_status: src.last_sync_status as string | null,
+            removable: src.added_by_staff_id === staff.id,
+          }))}
+          addAction={staffAddIcal.bind(null, property.id)}
+          deleteAction={staffDeleteIcal}
+          intro="Si esta cabaña también se renta en Airbnb, Booking u otra plataforma, conecta aquí su calendario para que esas fechas se bloqueen solas. Lo que reserves por WhatsApp o en persona, bloquéalo en el calendario de arriba el mismo día."
+        />
+      )}
 
       {staff.can_view_bookings && (
         <section className="rounded-2xl border border-stone/15 bg-white p-4 sm:p-5">
