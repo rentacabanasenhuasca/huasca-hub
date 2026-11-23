@@ -92,7 +92,7 @@ export async function loadCalendarWindow(propertyIds: string[], startDate: strin
       .lte('date', endDate),
     supabase
       .from('blocked_dates')
-      .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
+      .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label)')
       .in('property_id', propertyIds)
       .gte('date', startDate)
       .lte('date', endDate),
@@ -351,7 +351,7 @@ export async function setManualBlock(selections: Selection[], blocked: boolean, 
     [...byProperty.entries()].map(([propertyId, dates]) =>
       supabase
         .from('blocked_dates')
-        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
+        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label)')
         .eq('property_id', propertyId)
         .in('date', dates)
     )
@@ -391,7 +391,7 @@ export async function forceOpenDates(selections: Selection[]) {
     [...byProperty.entries()].map(([propertyId, dates]) =>
       supabase
         .from('blocked_dates')
-        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
+        .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label)')
         .eq('property_id', propertyId)
         .in('date', dates)
     )
@@ -776,4 +776,32 @@ export async function removeApplication(applicationId: string) {
 
   revalidatePath('/admin/calendario')
   return { error: null }
+}
+
+// Historial de movimientos del calendario (bloqueos/desbloqueos manuales y
+// por reserva). Lo llena un trigger en la base (calendar_block_log); las
+// sincronizaciones de Airbnb/Booking no se registran.
+export type BlockLogEntry = {
+  id: number
+  created_at: string
+  property_id: string
+  date: string
+  action: 'bloqueo' | 'desbloqueo' | 'cambio'
+  source: string | null
+  note: string | null
+  actor: string | null
+}
+
+export async function getBlockHistory(propertyId: string, date: string) {
+  await requireHost()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('calendar_block_log')
+    .select('id, created_at, property_id, date, action, source, note, actor')
+    .eq('property_id', propertyId)
+    .eq('date', date)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) return { error: `No se pudo cargar el historial: ${error.message}`, entries: [] as BlockLogEntry[] }
+  return { error: null, entries: (data ?? []) as BlockLogEntry[] }
 }

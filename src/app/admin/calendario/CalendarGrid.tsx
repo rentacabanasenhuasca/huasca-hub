@@ -12,6 +12,8 @@ import {
   setMinGuestsOverride,
   setPriceOverride,
   getBookingDetails,
+  getBlockHistory,
+  type BlockLogEntry,
   resendBookingEmails,
   getResendOptions,
   cancelBooking,
@@ -51,6 +53,7 @@ type BlockedDate = {
   note: string | null
   blocked_by?: string | null
   booking_id: string | null
+  created_at?: string | null
   external_summary: string | null
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
 }
@@ -225,6 +228,20 @@ function ResendEmailsButton({ bookingId }: { bookingId: string }) {
       {msg && <p className="mt-1.5 text-xs text-stone">{msg}</p>}
     </div>
   )
+}
+
+const LOG_ACTION_LABEL: Record<string, string> = { bloqueo: 'Bloqueó', desbloqueo: 'Desbloqueó', cambio: 'Cambió' }
+
+// Fecha y hora en horario de México, ej. "23 nov 2026, 8:59 a.m."
+function formatLogTime(iso: string) {
+  return new Date(iso).toLocaleString('es-MX', {
+    timeZone: 'America/Mexico_City',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 // Toda la información de una reserva directa: huésped, contacto, fechas,
@@ -635,6 +652,7 @@ export default function CalendarGrid({
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null)
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [history, setHistory] = useState<BlockLogEntry[] | null>(null)
 
   // Mover/cancelar la reserva que se está viendo en el panel de detalle.
   const [moveTarget, setMoveTarget] = useState('')
@@ -650,6 +668,8 @@ export default function CalendarGrid({
     setDetailsKind(blockedKind(blocked))
     setDetailsBlocked(blocked)
     setBookingDetails(null)
+    setHistory(null)
+    getBlockHistory(propertyId, date).then((res) => setHistory(res.entries)).catch(() => setHistory([]))
     setDetailsError(null)
     setMoveTarget('')
     setConfirmingCancel(false)
@@ -1869,6 +1889,34 @@ export default function CalendarGrid({
               ) : (
                 <p className="text-sm text-stone">Bloqueado por un calendario externo sincronizado.</p>
               )}
+
+              {(kind === 'manual' || kind === 'direct') && blocked?.created_at && (
+                <p className="mt-3 text-xs text-stone">
+                  Fecha de bloqueo: <span className="font-medium text-navy-deep">{formatLogTime(blocked.created_at)}</span>
+                </p>
+              )}
+
+              <div className="mt-4 pt-3 border-t border-stone/10">
+                <p className="text-xs font-medium text-navy-deep mb-1.5">Historial de este día</p>
+                {history === null ? (
+                  <p className="text-xs text-stone">Cargando…</p>
+                ) : history.length === 0 ? (
+                  <p className="text-xs text-stone">Sin movimientos registrados.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {history.map((h) => (
+                      <li key={h.id} className="text-xs text-stone">
+                        <span className="text-navy-deep">{formatLogTime(h.created_at)}</span> · {LOG_ACTION_LABEL[h.action] ?? h.action}
+                        {h.source === 'booking' ? ' (reserva)' : ''} · {h.actor ?? '—'}
+                        {h.note ? ` — ${h.note}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <a href="/admin/calendario/historial" className="mt-2 inline-block text-xs text-navy-deep underline underline-offset-2">
+                  Ver historial completo
+                </a>
+              </div>
 
               {kind === 'direct' && bookingDetails && (
                 <div className="mt-4 pt-4 border-t border-stone/10 space-y-3">

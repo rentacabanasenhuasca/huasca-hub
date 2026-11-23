@@ -107,7 +107,7 @@ export default async function CalendarioPage({
     propertyIds.length > 0
       ? supabase
           .from('blocked_dates')
-          .select('property_id, date, source, note, blocked_by, booking_id, external_summary, ical_sources(platform, label)')
+          .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label)')
           .in('property_id', propertyIds)
           .gte('date', start)
           .lte('date', end)
@@ -139,6 +139,10 @@ export default async function CalendarioPage({
           aplícales una regla. Administra las reglas en{' '}
           <a href="/admin/reglas" className="text-gold underline underline-offset-2">
             Reglas de precio
+          </a>
+          . ¿Quién bloqueó o desbloqueó algo?{' '}
+          <a href="/admin/calendario/historial" className="text-gold underline underline-offset-2">
+            Ver historial de movimientos
           </a>
           .
         </p>
