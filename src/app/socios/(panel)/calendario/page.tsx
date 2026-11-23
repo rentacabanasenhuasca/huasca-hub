@@ -46,6 +46,7 @@ export default async function SocioCalendarioPage() {
     from: today,
     until: addDays(today, 400),
     showBookingGuests: true,
+    showGuestContact: true,
     stayOwnerKey: null,
     hostLabel: 'Huasca Retreats',
   })
