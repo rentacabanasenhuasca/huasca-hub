@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { staffSetBlock } from './actions'
+import { staffSetBlock, staffMoveStay, staffUpdateStayPayment } from './actions'
+import StayTools, { type StayActions } from './StayTools'
 import type { GuestInput } from '@/lib/manual-stays'
 
 const CHANNELS = ['WhatsApp / directo', 'Airbnb', 'Booking', 'Recomendación', 'Otro']
@@ -14,7 +15,15 @@ const MONTHS_SHOWN = 13
 // en reservas y bloqueos manuales. label: el detalle completo al tocar el día.
 // details: renglones extra (datos del huésped de una reserva por fuera);
 // phone: para el botón de WhatsApp.
-export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string; tag?: string; details?: string[]; phone?: string | null }
+export type DayInfo = {
+  kind: 'manual' | 'booking' | 'external'
+  label: string
+  tag?: string
+  details?: string[]
+  phone?: string | null
+  // Reserva por fuera que se puede editar (pago) o mover de cabaña.
+  stay?: { id: string; paid: number | null; balance: number | null }
+}
 
 type SetBlock = (
   propertyId: string,
@@ -68,6 +77,8 @@ export default function StaffCalendar({
   days,
   canBlock,
   setBlock = staffSetBlock,
+  stayActions = { updatePayment: staffUpdateStayPayment, move: staffMoveStay },
+  moveTargets = [],
 }: {
   propertyId: string
   today: string
@@ -76,6 +87,9 @@ export default function StaffCalendar({
   // Acción que bloquea/libera días. Por defecto la del panel de colaboradores;
   // el panel de socios (/socios) pasa la suya.
   setBlock?: SetBlock
+  stayActions?: StayActions
+  // Otras cabañas a las que se puede mover una reserva por fuera.
+  moveTargets?: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -348,6 +362,9 @@ export default function StaffCalendar({
             >
               Escribir por WhatsApp
             </a>
+          )}
+          {canBlock && days[focused].stay && (
+            <StayTools key={days[focused].stay!.id} stay={days[focused].stay!} targets={moveTargets} actions={stayActions} />
           )}
         </div>
       )}
