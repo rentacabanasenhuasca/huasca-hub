@@ -25,11 +25,12 @@ export default async function EditarCabanaPage({
   if (!property) notFound()
 
   const service = createServiceClient()
-  const [amenities, { data: chosen }, { data: photos }, { data: sources }] = await Promise.all([
+  const [amenities, { data: chosen }, { data: photos }, { data: sources }, { data: beds }] = await Promise.all([
     loadAmenities(),
     service.from('property_amenities').select('amenity_id').eq('property_id', id),
     service.from('property_photos').select('url, sort_order').eq('property_id', id).order('sort_order'),
     service.from('ical_sources').select('id, label, platform, last_synced_at, last_sync_status').eq('property_id', id).order('label'),
+    service.from('property_beds').select('room_type, room_number, bed_type, quantity').eq('property_id', id).order('sort_order'),
   ])
   const parts = splitDescription(property.description as string | null)
 
@@ -89,6 +90,12 @@ export default async function EditarCabanaPage({
           partner_price_weekend: property.partner_price_weekend ? Number(property.partner_price_weekend) : '',
           amenity_ids: (chosen ?? []).map((a) => a.amenity_id as string),
           photos: (photos ?? []).map((p) => p.url as string),
+          bed_rows: (beds ?? []).map((b) => ({
+            room_type: b.room_type as 'recamara' | 'altillo_tapanco' | 'otro',
+            room_number: b.room_number as number | null,
+            bed_type: b.bed_type as string,
+            quantity: Number(b.quantity) || 1,
+          })),
         }}
       />
     </div>
