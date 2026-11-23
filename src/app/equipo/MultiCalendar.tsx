@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { DayInfo } from './StaffCalendar'
 import type { GuestInput } from '@/lib/manual-stays'
+import StayTools, { type StayActions } from './StayTools'
 
 type SetBlock = (
   propertyId: string,
@@ -66,12 +67,14 @@ export default function MultiCalendar({
   days,
   canBlock,
   setBlock,
+  stayActions,
 }: {
   properties: Property[]
   today: string
   days: Record<string, Record<string, DayInfo>>
   canBlock: boolean
   setBlock: SetBlock
+  stayActions?: StayActions
 }) {
   const router = useRouter()
   const [offset, setOffset] = useState(0)
@@ -422,6 +425,14 @@ export default function MultiCalendar({
             >
               Escribir por WhatsApp
             </a>
+          )}
+          {canBlock && stayActions && focusedInfo.stay && (
+            <StayTools
+              key={focusedInfo.stay.id}
+              stay={focusedInfo.stay}
+              targets={properties.filter((p) => p.id !== focused.propertyId).map((p) => ({ id: p.id, name: p.name }))}
+              actions={stayActions}
+            />
           )}
         </div>
       )}
