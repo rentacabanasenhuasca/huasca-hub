@@ -26,17 +26,10 @@ type BookingRow = {
   children: number | null
   infants: number | null
   pets: boolean | null
-  guest_notes: string | null
-  booking_addons: { name: string; quantity: number | null; answers: { label: string; value: string }[] | null }[] | null
-}
-
-function shortDate(date: string) {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 }
 
 /** Renglones del panel de información para una reserva hecha en el sitio. */
 function bookingLines(b: BookingRow, withContact: boolean) {
-  const nights = Math.round((Date.parse(b.check_out) - Date.parse(b.check_in)) / 86_400_000)
   const people = [
     `${b.adults ?? 0} adulto${b.adults === 1 ? '' : 's'}`,
     b.children ? `${b.children} niño${b.children === 1 ? '' : 's'}` : null,
@@ -45,19 +38,10 @@ function bookingLines(b: BookingRow, withContact: boolean) {
   ]
     .filter(Boolean)
     .join(', ')
-  const lines = [
-    `Estancia: ${shortDate(b.check_in)} → ${shortDate(b.check_out)} (${nights} noche${nights === 1 ? '' : 's'})`,
-    `Personas: ${people}`,
-  ]
+  // Solo lo que el equipo necesita: personas y teléfono (el nombre va en el
+  // título). Nada de montos, notas, extras ni por dónde llegó la reserva.
+  const lines = [`Personas: ${people}`]
   if (withContact && b.guest_phone) lines.push(`Teléfono: ${b.guest_phone}`)
-  for (const a of b.booking_addons ?? []) {
-    const answers = (a.answers ?? [])
-      .filter((x) => x && x.value)
-      .map((x) => `${x.label}: ${x.value}`)
-      .join(' · ')
-    lines.push(`Extra: ${a.name}${a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ''}${answers ? ` (${answers})` : ''}`)
-  }
-  if (b.guest_notes) lines.push(`Notas del huésped: ${b.guest_notes}`)
   return lines
 }
 
@@ -110,7 +94,7 @@ export async function loadCalendarDays(
       ? service
           .from('bookings')
           .select(
-            'id, guest_name, guest_phone, check_in, check_out, adults, children, infants, pets, guest_notes, booking_addons(name, quantity, answers)'
+            'id, guest_name, guest_phone, check_in, check_out, adults, children, infants, pets'
           )
           .in('property_id', propertyIds)
           .eq('status', 'confirmed')
@@ -146,7 +130,7 @@ export async function loadCalendarDays(
       const guest = b?.guest_name ?? ''
       days[row.date] = {
         kind: 'booking',
-        label: guest ? `Reserva en el sitio — ${guest}` : 'Reserva en el sitio',
+        label: guest ? `Reserva — ${guest}` : 'Reservado',
         tag: guest ? guest.split(' ')[0] : 'Reserva',
         details: b ? bookingLines(b, Boolean(opts.showGuestContact)) : undefined,
         phone: b && opts.showGuestContact ? b.guest_phone : null,
