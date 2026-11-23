@@ -41,6 +41,14 @@ export async function staffSetBlock(
     const { error } = await service.from('blocked_dates').upsert(rows, { onConflict: 'property_id,date' })
     if (error) return { error: `No se pudo bloquear: ${error.message}` }
   } else {
+    // Marca quién desbloquea justo antes de borrar, para que el historial
+    // del calendario (trigger en la base) registre a este colaborador.
+    await service
+      .from('blocked_dates')
+      .update({ blocked_by: staff.name })
+      .eq('property_id', propertyId)
+      .eq('source', 'manual')
+      .in('date', clean)
     const { error } = await service
       .from('blocked_dates')
       .delete()
