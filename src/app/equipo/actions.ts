@@ -5,8 +5,11 @@
 // venga de Airbnb/iCal. Los bloqueos manuales salen en el iCal que lee
 // Airbnb, así que se sincronizan solos.
 import { revalidatePath } from 'next/cache'
-import { requireStaff } from '@/lib/staff'
+import { requireStaff, staffOwnerKey } from '@/lib/staff'
 import { createServiceClient } from '@/lib/supabase/service'
+import { cleanGuest, createStay, type GuestInput } from '@/lib/manual-stays'
+import { guessPlatform } from '@/lib/ical'
+import { syncOneIcalSource } from '@/lib/ical-sync'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -14,7 +17,8 @@ export async function staffSetBlock(
   propertyId: string,
   dates: string[],
   blocked: boolean,
-  note?: string | null
+  note?: string | null,
+  guestInput?: GuestInput | null
 ): Promise<{ error: string | null }> {
   const staff = await requireStaff()
   if (!staff.can_block_dates) return { error: 'No tienes permiso para bloquear fechas.' }
@@ -34,12 +38,38 @@ export async function staffSetBlock(
       .in('date', clean)
     const taken = new Set((existing ?? []).filter((r) => r.source !== 'manual').map((r) => r.date))
     const text = note?.trim() || null
-    const rows = clean
-      .filter((d) => !taken.has(d))
-      .map((date) => ({ property_id: propertyId, date, source: 'manual' as const, note: text, blocked_by: staff.name }))
-    if (rows.length === 0) return { error: 'Esas fechas ya están ocupadas por una reserva o por otra plataforma.' }
+    const free = clean.filter((d) => !taken.has(d))
+    if (free.length === 0) return { error: 'Esas fechas ya están ocupadas por una reserva o por otra plataforma.' }
+
+    // Si es una reserva por fuera, primero se guarda quién llega.
+    const guest = cleanGuest(guestInput)
+    let stayId: string | null = null
+    if (guest) {
+      const stay = await createStay(service, {
+        propertyId,
+        dates: free,
+        guest,
+        createdBy: staff.name,
+        ownerKey: staffOwnerKey(staff),
+        staffId: staff.id,
+      })
+      if (stay.error) return { error: `No se pudieron guardar los datos del huésped: ${stay.error}` }
+      stayId = stay.id
+    }
+
+    const rows = free.map((date) => ({
+      property_id: propertyId,
+      date,
+      source: 'manual' as const,
+      note: text,
+      blocked_by: staff.name,
+      stay_id: stayId,
+    }))
     const { error } = await service.from('blocked_dates').upsert(rows, { onConflict: 'property_id,date' })
-    if (error) return { error: `No se pudo bloquear: ${error.message}` }
+    if (error) {
+      if (stayId) await service.from('manual_stays').delete().eq('id', stayId)
+      return { error: `No se pudo bloquear: ${error.message}` }
+    }
   } else {
     // Marca quién desbloquea justo antes de borrar, para que el historial
     // del calendario (trigger en la base) registre a este colaborador.
@@ -61,4 +91,67 @@ export async function staffSetBlock(
   revalidatePath('/equipo')
   revalidatePath('/admin/calendario')
   return { error: null }
+}
+
+// ---- iCal (Airbnb, Booking, otras) ------------------------------------------
+// Mismo flujo que el panel de socios: el colaborador pega la liga de
+// "exportar calendario" de la otra plataforma y esas fechas se bloquean solas.
+type Result = { error: string | null }
+
+async function staffWithProperty(propertyId: string) {
+  const staff = await requireStaff()
+  if (!staff.can_block_dates) return null
+  if (!staff.properties.some((p) => p.id === propertyId)) return null
+  return staff
+}
+
+export async function staffAddIcal(propertyId: string, _prev: Result, formData: FormData): Promise<Result> {
+  const staff = await staffWithProperty(propertyId)
+  if (!staff) return { error: 'No tienes permiso para conectar calendarios de esta cabaña.' }
+  const label = String(formData.get('label') || '').trim()
+  const url = String(formData.get('url') || '').trim()
+  if (!label) return { error: 'Ponle nombre al calendario (ej. Airbnb).' }
+  if (!/^(https?|webcal):\/\//i.test(url)) return { error: 'Pega la liga completa del calendario (empieza con https://).' }
+
+  const service = createServiceClient()
+  const icalUrl = url.replace(/^webcal:\/\//i, 'https://')
+  const { data: source, error } = await service
+    .from('ical_sources')
+    .insert({
+      property_id: propertyId,
+      label,
+      platform: guessPlatform(icalUrl),
+      ical_url_import: icalUrl,
+      added_by_staff_id: staff.id,
+    })
+    .select('id')
+    .single()
+  if (error || !source) return { error: `No se pudo agregar: ${error?.message}` }
+
+  const result = await syncOneIcalSource(service, source.id, propertyId, icalUrl)
+  revalidatePath('/equipo')
+  revalidatePath('/admin/calendario')
+  if (result.error) {
+    return { error: `Se agregó, pero no se pudo leer todavía: ${result.error}. Revisa que la liga sea la de "exportar calendario".` }
+  }
+  return { error: null }
+}
+
+export async function staffDeleteIcal(propertyId: string, sourceId: string) {
+  const staff = await staffWithProperty(propertyId)
+  if (!staff) return
+  const service = createServiceClient()
+  // Solo puede quitar los calendarios que él mismo conectó (no los que puso
+  // el anfitrión, como el de Airbnb de la cabaña).
+  const { data: deleted } = await service
+    .from('ical_sources')
+    .delete()
+    .eq('id', sourceId)
+    .eq('property_id', propertyId)
+    .eq('added_by_staff_id', staff.id)
+    .select('id')
+  if (!deleted?.length) return
+  await service.from('blocked_dates').delete().eq('property_id', propertyId).eq('ical_source_id', sourceId)
+  revalidatePath('/equipo')
+  revalidatePath('/admin/calendario')
 }
