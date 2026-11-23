@@ -19,6 +19,7 @@ const ALLOWED_PREFIXES = [
   '/mantenimiento',
   '/admin',
   '/login',
+  '/socios',
   '/api',
   '/_next',
   '/favicon.ico',
