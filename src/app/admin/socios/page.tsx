@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import { mxn, type Partner } from '@/lib/partners'
 import { SITE_URL } from '@/lib/site'
-import { AccountStatusButton, ApproveButton, PayoutButton, VerifyBankButton } from './SociosControls'
+import { AccountStatusButton, ApproveButton, DeletePartnerButton, PayoutButton, VerifyBankButton } from './SociosControls'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,7 +175,10 @@ export default async function SociosAdminPage() {
                       {p.name}{' '}
                       {p.status === 'suspended' && <span className="ml-1 rounded-full bg-burnt-orange/15 px-2 py-0.5 text-xs text-burnt-orange">Suspendido</span>}
                     </p>
-                    <AccountStatusButton partnerId={p.id as string} status={p.status as string} />
+                    <div className="flex flex-wrap gap-2">
+                      <AccountStatusButton partnerId={p.id as string} status={p.status as string} />
+                      <DeletePartnerButton partnerId={p.id as string} name={p.name as string} />
+                    </div>
                   </div>
                   <p className="text-xs text-stone">
                     {p.email} · {p.phone} · registrado {fmt(String(p.created_at).slice(0, 10))}
