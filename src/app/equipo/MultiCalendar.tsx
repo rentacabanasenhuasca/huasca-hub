@@ -275,7 +275,7 @@ export default function MultiCalendar({
           <span className="h-3 w-3 rounded bg-stone/25" /> Bloqueado a mano / reserva por fuera
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-navy" /> Reserva del sitio
+          <span className="h-3 w-3 rounded bg-navy" /> Reservado
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-burnt-orange/20" /> Airbnb / otra plataforma
