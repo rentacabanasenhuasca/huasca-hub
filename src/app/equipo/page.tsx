@@ -3,7 +3,7 @@ import { requireStaff, staffOwnerKey } from '@/lib/staff'
 import { STAY_COLUMNS, stayLines, paymentText, waLink, type ManualStay } from '@/lib/manual-stays'
 import { SITE_URL } from '@/lib/site'
 import IcalPanel from '@/app/socios/(panel)/cabana/IcalPanel'
-import { staffAddIcal, staffDeleteIcal, staffSetBlock } from './actions'
+import { staffAddIcal, staffDeleteIcal, staffMoveStay, staffSetBlock, staffUpdateStayPayment } from './actions'
 import MultiCalendar from './MultiCalendar'
 import { loadCalendarDays } from '@/lib/calendar-days'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -79,6 +79,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
           days={days}
           canBlock={staff.can_block_dates}
           setBlock={staffSetBlock}
+          stayActions={{ updatePayment: staffUpdateStayPayment, move: staffMoveStay }}
         />
       </div>
     )
@@ -149,6 +150,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         label: `Reserva por fuera — ${stay.guest_name}${row.note ? ` (${row.note})` : ''}`,
         tag: stay.guest_name.split(' ')[0],
         details: stayLines(stay),
+        stay: { id: stay.id, paid: stay.paid_mxn, balance: stay.balance_mxn },
         phone: stay.guest_phone,
       }
     else if (row.source === 'manual')
@@ -208,6 +210,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         today={today}
         days={days}
         canBlock={staff.can_block_dates}
+        moveTargets={staff.properties.filter((x) => x.id !== property.id).map((x) => ({ id: x.id, name: x.name }))}
       />
 
       {stays.length > 0 && (
