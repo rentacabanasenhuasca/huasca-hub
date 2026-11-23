@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { requirePartner, partnerProperty } from '@/lib/partners'
 import { createServiceClient } from '@/lib/supabase/service'
 import { SITE_URL } from '@/lib/site'
-import { partnerAddIcal, savePartnerProperty } from '../../../actions'
+import { partnerAddIcal, partnerDeleteIcal, savePartnerProperty } from '../../../actions'
 import PartnerPropertyForm from '../PartnerPropertyForm'
 import StateButtons from '../StateButtons'
 import IcalPanel from '../IcalPanel'
@@ -63,6 +63,7 @@ export default async function EditarCabanaPage({
           last_sync_status: s.last_sync_status as string | null,
         }))}
         addAction={partnerAddIcal.bind(null, id)}
+        deleteAction={partnerDeleteIcal}
       />
 
       <PartnerPropertyForm
