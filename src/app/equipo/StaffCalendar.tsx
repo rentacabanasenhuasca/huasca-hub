@@ -46,11 +46,15 @@ export default function StaffCalendar({
   today,
   days,
   canBlock,
+  setBlock = staffSetBlock,
 }: {
   propertyId: string
   today: string
   days: Record<string, DayInfo>
   canBlock: boolean
+  // Acción que bloquea/libera días. Por defecto la del panel de colaboradores;
+  // el panel de socios (/socios) pasa la suya.
+  setBlock?: (propertyId: string, dates: string[], blocked: boolean, note?: string | null) => Promise<{ error: string | null }>
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -83,7 +87,7 @@ export default function StaffCalendar({
     const dates = blocked ? selectedFree : selectedManual
     if (dates.length === 0) return
     startTransition(async () => {
-      const r = await staffSetBlock(propertyId, dates, blocked, note)
+      const r = await setBlock(propertyId, dates, blocked, note)
       if (r.error) {
         setMessage(r.error)
         return
