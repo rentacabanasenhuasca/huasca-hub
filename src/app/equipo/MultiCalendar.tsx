@@ -326,13 +326,6 @@ export default function MultiCalendar({
                 inputMode="numeric"
                 className={fieldCls}
               />
-              <input
-                value={guest.amount_mxn}
-                onChange={(e) => setGuest({ ...guest, amount_mxn: e.target.value.replace(/[^\d.]/g, '') })}
-                placeholder="Monto cobrado (MXN)"
-                inputMode="decimal"
-                className={fieldCls}
-              />
               <select value={guest.channel} onChange={(e) => setGuest({ ...guest, channel: e.target.value })} className={fieldCls}>
                 {CHANNELS.map((c) => (
                   <option key={c}>{c}</option>
