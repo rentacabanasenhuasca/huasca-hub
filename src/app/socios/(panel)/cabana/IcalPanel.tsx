@@ -2,9 +2,16 @@
 
 import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { partnerDeleteIcal } from '../../actions'
 
-type Source = { id: string; label: string; platform: string; last_synced_at: string | null; last_sync_status: string | null }
+type Source = {
+  id: string
+  label: string
+  platform: string
+  last_synced_at: string | null
+  last_sync_status: string | null
+  // false = lo conectó el anfitrión; aquí solo se muestra.
+  removable?: boolean
+}
 type Result = { error: string | null }
 
 const input =
@@ -15,11 +22,15 @@ export default function IcalPanel({
   exportUrl,
   sources,
   addAction,
+  deleteAction,
+  intro,
 }: {
   propertyId: string
   exportUrl: string
   sources: Source[]
   addAction: (prev: Result, formData: FormData) => Promise<Result>
+  deleteAction: (propertyId: string, sourceId: string) => Promise<void>
+  intro?: string
 }) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(addAction, { error: null })
@@ -31,8 +42,9 @@ export default function IcalPanel({
       <div>
         <h2 className="font-medium text-navy-deep">Conectar calendarios (Airbnb, Booking y otras)</h2>
         <p className="text-xs text-stone mt-1">
-          Muy importante: si rentas tu cabaña por otros lados, conecta aquí su calendario para que esas fechas se bloqueen solas. Si reservas
-          por WhatsApp o en persona, bloquea esas fechas en tu calendario el mismo día.
+          {intro ??
+            `Muy importante: si rentas tu cabaña por otros lados, conecta aquí su calendario para que esas fechas se bloqueen solas. Si reservas
+          por WhatsApp o en persona, bloquea esas fechas en tu calendario el mismo día.`}
         </p>
       </div>
 
@@ -51,13 +63,16 @@ export default function IcalPanel({
                     {s.last_sync_status && !s.last_sync_status.startsWith('ok') ? ` · ${s.last_sync_status}` : ''}
                   </span>
                 </span>
+                {s.removable === false ? (
+                  <span className="text-[11px] text-stone">Conectado por el anfitrión</span>
+                ) : (
                 <button
                   type="button"
                   disabled={deleting}
                   onClick={() => {
                     if (!window.confirm(`¿Desconectar ${s.label}? Las fechas que venían de ahí se liberan.`)) return
                     startDelete(async () => {
-                      await partnerDeleteIcal(propertyId, s.id)
+                      await deleteAction(propertyId, s.id)
                       router.refresh()
                     })
                   }}
@@ -65,6 +80,7 @@ export default function IcalPanel({
                 >
                   Quitar
                 </button>
+                )}
               </li>
             ))}
           </ul>
