@@ -3,7 +3,9 @@ import { requireStaff, staffOwnerKey } from '@/lib/staff'
 import { STAY_COLUMNS, stayLines, mxn, waLink, type ManualStay } from '@/lib/manual-stays'
 import { SITE_URL } from '@/lib/site'
 import IcalPanel from '@/app/socios/(panel)/cabana/IcalPanel'
-import { staffAddIcal, staffDeleteIcal } from './actions'
+import { staffAddIcal, staffDeleteIcal, staffSetBlock } from './actions'
+import MultiCalendar from './MultiCalendar'
+import { loadCalendarDays } from '@/lib/calendar-days'
 import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import StaffCalendar, { type DayInfo } from './StaffCalendar'
@@ -37,10 +39,51 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
     )
   }
 
-  const property = staff.properties.find((x) => x.id === p) ?? staff.properties[0]
   const today = todayInMexicoStr()
   const until = addDays(today, 400)
   const service = createServiceClient()
+
+  // Con varias cabañas, la vista principal es la lista (una fila por cabaña).
+  // Tocar el nombre abre el detalle de esa cabaña (calendario por meses,
+  // reservas e iCal).
+  if (staff.properties.length > 1 && !staff.properties.some((x) => x.id === p)) {
+    const ids = staff.properties.map((x) => x.id)
+    const [days, { data: photos }] = await Promise.all([
+      loadCalendarDays(service, {
+        propertyIds: ids,
+        from: today,
+        until,
+        showBookingGuests: staff.can_view_bookings,
+        stayOwnerKey: staff.can_view_bookings ? null : staffOwnerKey(staff),
+        hostLabel: 'el anfitrión',
+      }),
+      service.from('property_photos').select('property_id, url, sort_order').in('property_id', ids).order('sort_order'),
+    ])
+    const photo = new Map<string, string>()
+    for (const ph of photos ?? []) if (!photo.has(ph.property_id)) photo.set(ph.property_id, ph.url)
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold text-navy-deep">Calendario de tus cabañas</h1>
+          <p className="text-sm text-stone mt-1">
+            {staff.can_block_dates
+              ? 'Toca los días (de una o varias cabañas) y elige Bloquear o Desbloquear. Si es una reserva por fuera, marca "Es una reserva" y anota los datos del huésped. Toca un día ocupado para ver quién es. Toca el nombre de una cabaña para ver su detalle y conectar sus calendarios.'
+              : 'Aquí ves qué días están libres y cuáles ocupados. Toca un día ocupado para ver quién es.'}
+          </p>
+        </div>
+        <MultiCalendar
+          properties={staff.properties.map((x) => ({ id: x.id, name: x.name, photo: photo.get(x.id) ?? null, href: `/equipo?p=${x.id}` }))}
+          today={today}
+          days={days}
+          canBlock={staff.can_block_dates}
+          setBlock={staffSetBlock}
+        />
+      </div>
+    )
+  }
+
+  const property = staff.properties.find((x) => x.id === p) ?? staff.properties[0]
 
   // Datos de huéspedes de reservas por fuera: solo los de su grupo (él, su
   // jefe y su equipo), salvo que el anfitrión le haya dado "Ver reservas".
@@ -128,6 +171,12 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
     <div className="space-y-6">
       {staff.properties.length > 1 && (
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/equipo"
+            className="rounded-full border border-stone/25 bg-white px-4 py-1.5 text-sm text-navy-deep transition hover:border-gold"
+          >
+            ← Todas
+          </Link>
           {staff.properties.map((x) => (
             <Link
               key={x.id}
