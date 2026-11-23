@@ -66,6 +66,8 @@ type ManualStayInfo = {
   guest_phone: string | null
   guests: number | null
   amount_mxn: number | null
+  paid_mxn?: number | null
+  balance_mxn?: number | null
   channel: string | null
   notes: string | null
   created_by: string
@@ -1921,6 +1923,19 @@ export default function CalendarGrid({
                           {stay.amount_mxn ? ` · $${Math.round(stay.amount_mxn).toLocaleString('es-MX')}` : ''}
                           {stay.channel ? ` · ${stay.channel}` : ''}
                         </p>
+                        {(stay.paid_mxn != null || stay.balance_mxn != null) && (
+                          <p className="text-stone">
+                            Pago:{' '}
+                            {stay.balance_mxn === 0
+                              ? 'pagado completo'
+                              : [
+                                  stay.paid_mxn != null ? `ya pagó $${Math.round(stay.paid_mxn).toLocaleString('es-MX')}` : null,
+                                  stay.balance_mxn != null ? `debe $${Math.round(stay.balance_mxn).toLocaleString('es-MX')}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                          </p>
+                        )}
                         {stay.notes && <p className="text-stone">Notas: {stay.notes}</p>}
                         {stay.guest_phone && (
                           <a
