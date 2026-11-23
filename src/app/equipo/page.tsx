@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { requireStaff, staffOwnerKey } from '@/lib/staff'
-import { STAY_COLUMNS, stayLines, mxn, waLink, type ManualStay } from '@/lib/manual-stays'
+import { STAY_COLUMNS, stayLines, waLink, type ManualStay } from '@/lib/manual-stays'
 import { SITE_URL } from '@/lib/site'
 import IcalPanel from '@/app/socios/(panel)/cabana/IcalPanel'
 import { staffAddIcal, staffDeleteIcal, staffSetBlock } from './actions'
@@ -221,7 +221,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
                   {st.guests ? ` · ${st.guests} persona(s)` : ''}
                 </p>
                 <p className="text-stone">
-                  {[st.amount_mxn ? mxn(st.amount_mxn) : null, st.channel, st.notes, `anotó ${st.created_by}`]
+                  {[st.channel, st.notes, `anotó ${st.created_by}`]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>
