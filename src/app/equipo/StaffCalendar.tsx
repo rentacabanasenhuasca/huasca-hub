@@ -82,7 +82,7 @@ export default function StaffCalendar({
   const [note, setNote] = useState('')
   // Datos del huésped (opcional): para bloqueos que son una reserva por fuera.
   const [withGuest, setWithGuest] = useState(false)
-  const [guest, setGuest] = useState({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', channel: CHANNELS[0], notes: '' })
+  const [guest, setGuest] = useState({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', paid_mxn: '', balance_mxn: '', channel: CHANNELS[0], notes: '' })
   const [message, setMessage] = useState<string | null>(null)
   // Último día ocupado que se tocó, para mostrar quién/qué lo bloqueó.
   const [focused, setFocused] = useState<string | null>(null)
@@ -121,6 +121,8 @@ export default function StaffCalendar({
             guest_phone: guest.guest_phone,
             guests: guest.guests ? Number(guest.guests) : null,
             amount_mxn: guest.amount_mxn ? Number(guest.amount_mxn) : null,
+            paid_mxn: guest.paid_mxn !== '' ? Number(guest.paid_mxn) : null,
+            balance_mxn: guest.balance_mxn !== '' ? Number(guest.balance_mxn) : null,
             channel: guest.channel,
             notes: guest.notes,
           }
@@ -135,7 +137,7 @@ export default function StaffCalendar({
       setSelected(new Set())
       setNote('')
       setWithGuest(false)
-      setGuest({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', channel: CHANNELS[0], notes: '' })
+      setGuest({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', paid_mxn: '', balance_mxn: '', channel: CHANNELS[0], notes: '' })
       router.refresh()
     })
   }
@@ -239,6 +241,20 @@ export default function StaffCalendar({
                 onChange={(e) => setGuest({ ...guest, guests: e.target.value.replace(/\D/g, '') })}
                 placeholder="¿Cuántas personas?"
                 inputMode="numeric"
+                className={fieldCls}
+              />
+              <input
+                value={guest.paid_mxn}
+                onChange={(e) => setGuest({ ...guest, paid_mxn: e.target.value.replace(/[^\d.]/g, '') })}
+                placeholder="¿Cuánto ya pagó? (MXN)"
+                inputMode="decimal"
+                className={fieldCls}
+              />
+              <input
+                value={guest.balance_mxn}
+                onChange={(e) => setGuest({ ...guest, balance_mxn: e.target.value.replace(/[^\d.]/g, '') })}
+                placeholder="¿Cuánto debe? (0 = ya pagó todo)"
+                inputMode="decimal"
                 className={fieldCls}
               />
               <select
