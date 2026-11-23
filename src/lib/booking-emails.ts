@@ -93,16 +93,23 @@ function renderSubject(text: string, data: Record<string, string>) {
 
 // Botón verde de WhatsApp para escribirle al huésped (abre el chat con su
 // número y un saludo listo). Vacío si la reserva no trae teléfono.
-function whatsappButtonHtml(phone: string, guestName: string, propertyName: string, checkIn: string) {
+function waButton(phone: string | null | undefined, text: string, label: string) {
   const digits = whatsappDigits(phone)
   if (!digits) return ''
-  const firstName = guestName.trim().split(/\s+/)[0] ?? ''
-  const text = `Hola ${firstName}, te escribimos de Huasca Retreats sobre tu reserva en ${propertyName} (llegada ${checkIn}).`
   const href = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
   return (
     `<a href="${href}" target="_blank" rel="noopener" ` +
     `style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;font-weight:600;` +
-    `padding:12px 22px;border-radius:999px;font-size:15px;">💬 Escribir por WhatsApp al huésped</a>`
+    `padding:12px 22px;border-radius:999px;font-size:15px;">💬 ${label}</a>`
+  )
+}
+
+function whatsappButtonHtml(phone: string, guestName: string, propertyName: string, checkIn: string) {
+  const firstName = guestName.trim().split(/\s+/)[0] ?? ''
+  return waButton(
+    phone,
+    `Hola ${firstName}, te escribimos de Huasca Retreats sobre tu reserva en ${propertyName} (llegada ${checkIn}).`,
+    'Escribir por WhatsApp al huésped'
   )
 }
 
@@ -138,7 +145,8 @@ export async function sendBookingEmails(
     .from('bookings')
     .select(
       `id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants,
-       pets, total_price_mxn, payment_provider,
+       pets, total_price_mxn, payment_provider, partner_id, partner_payout_mxn,
+       partners ( name, email, phone, bank_name, bank_clabe ),
        properties ( id, name, host_id, hosts ( name, email, phone ) )`
     )
     .eq('id', bookingId)
@@ -202,6 +210,40 @@ export async function sendBookingEmails(
     addons: addonsText,
     guest_whatsapp_link: whatsappDigits(booking.guest_phone) ? `https://wa.me/${whatsappDigits(booking.guest_phone)}` : '',
   }
+  // Cabaña de socio (ver src/lib/partners.ts): al correo del administrador se
+  // le agrega cuánto hay que pagarle al socio y cuándo.
+  const partner = booking.partner_id
+    ? ((Array.isArray(booking.partners) ? booking.partners[0] : booking.partners) as {
+        name: string
+        email: string
+        phone: string | null
+        bank_name: string | null
+        bank_clabe: string | null
+      } | null)
+    : null
+  const payout = Number(booking.partner_payout_mxn ?? 0)
+  const payDate = (() => {
+    const d = new Date(`${booking.check_in}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + 1)
+    return d.toISOString().slice(0, 10)
+  })()
+  const money = (n: number) => `$${Math.round(n).toLocaleString('es-MX')} MXN`
+  const adminPartnerNote = partner
+    ? `🤝 Cabaña de socio: ${partner.name}.\nPagar al socio: ${money(payout)} el ${payDate} (día siguiente del check-in)` +
+      (partner.bank_clabe ? ` a ${partner.bank_name ?? 'su cuenta'} terminación ${partner.bank_clabe.slice(-4)}.` : '. ⚠️ Aún no registra datos de pago.') +
+      `\nTe queda: ${money(Number(booking.total_price_mxn ?? 0) - payout)} (antes de comisión de Stripe).` +
+      `\nWhatsApp del socio: ${partner.phone ?? '—'}` +
+      (partner.phone
+        ? `\n\n` +
+          waButton(
+            partner.phone,
+            `¡Hola ${partner.name.split(' ')[0]}! Se reservó tu espacio ${property.name ?? ''} del ${booking.check_in} al ${booking.check_out} (${booking.guest_name ?? 'huésped'}). Ya te llegó el correo con los datos. 🙌`,
+            'Avisar al socio por WhatsApp'
+          )
+        : '')
+    : ''
+  data.partner_payout = partner ? money(payout) : ''
+
   // Solo para el cuerpo (HTML): el asunto es texto plano.
   const whatsappButton = whatsappButtonHtml(data.guest_phone, data.guest_name, data.property_name, data.check_in)
   const bodyData = { ...data, guest_whatsapp_button: whatsappButton }
@@ -244,7 +286,14 @@ export async function sendBookingEmails(
     const result = await sendEmail({
       to: recipients,
       subject: renderSubject(template.subject, data),
-      html: wrapBrandedEmail(renderBodyHtml(withWhatsappButton(template, whatsappButton), bodyData)),
+      html: wrapBrandedEmail(
+        renderBodyHtml(
+          template.recipient_type === 'admin' && adminPartnerNote
+            ? `${withWhatsappButton(template, whatsappButton).trimEnd()}\n\n${adminPartnerNote}`
+            : withWhatsappButton(template, whatsappButton),
+          bodyData
+        )
+      ),
       attachments: [
         {
           filename: 'huasca-retreats.png',
@@ -257,6 +306,46 @@ export async function sendBookingEmails(
 
     if (result.ok) sent += 1
     else errors.push(`"${template.subject}": ${result.error}`)
+  }
+
+  // Aviso al socio dueño de la cabaña (solo en el envío normal, no cuando se
+  // reenvían correos elegidos a mano).
+  if (partner?.email && !templateIds && !overrideTo) {
+    const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+    const html = wrapBrandedEmail(
+      [
+        `Hola ${esc(partner.name)},`,
+        `¡Hey! <strong>${esc(data.guest_name)}</strong> reservó tu espacio <strong>${esc(data.property_name)}</strong> en Huasca Retreats. 🎉`,
+        `<strong>Llegada:</strong> ${data.check_in}<br /><strong>Salida:</strong> ${data.check_out}<br /><strong>Noches:</strong> ${nights}<br />` +
+          `<strong>Huéspedes:</strong> ${data.adults} adultos, ${data.children} niños, ${data.infants} bebés · mascotas: ${data.pets}`,
+        `<strong>Huésped:</strong> ${esc(data.guest_name)}<br /><strong>Teléfono:</strong> ${esc(data.guest_phone)}<br /><strong>Correo:</strong> ${esc(data.guest_email)}` +
+          (data.guest_notes ? `<br /><strong>Notas:</strong> ${esc(data.guest_notes)}` : ''),
+        waButton(
+          data.guest_phone,
+          `Hola ${data.guest_name.split(' ')[0]}, soy ${partner.name.split(' ')[0]}, anfitrión de ${data.property_name} (reservaste por Huasca Retreats). Te escribo para coordinar tu llegada el ${data.check_in}. 🙌`,
+          'Escribir por WhatsApp al huésped'
+        ),
+        `Tú eres responsable de recibir al huésped, de la limpieza y de su atención durante la estancia.`,
+        `<strong>Recibes:</strong> ${money(payout)}, que te depositamos el ${payDate} (día siguiente del check-in)` +
+          (partner.bank_clabe ? ` a tu cuenta terminación ${partner.bank_clabe.slice(-4)}.` : '. ⚠️ Registra tus datos de pago en tu panel para poder depositarte.'),
+        `Las fechas ya quedaron bloqueadas en tu calendario de Huasca Retreats. Si también rentas por otras plataformas sin calendario conectado, bloquéalas allá hoy mismo.`,
+        `Recuerda: esta reserva es un compromiso con el huésped. Cancelarla puede tener penalización. Si surge cualquier problema, escríbenos de inmediato.`,
+        `Tu panel: <a href="https://huascaretreats.com/socios">huascaretreats.com/socios</a>`,
+      ]
+        .filter(Boolean)
+        .map((p) => `<p style="margin:0 0 16px 0;">${p}</p>`)
+        .join('')
+    )
+    const result = await sendEmail({
+      to: [partner.email],
+      subject: `Se reservó tu espacio ${data.property_name}: ${data.check_in} → ${data.check_out}`,
+      html,
+      attachments: [
+        { filename: 'huasca-retreats.png', content: Buffer.from(LOGO_PNG_BASE64, 'base64'), cid: LOGO_CID, contentType: 'image/png' },
+      ],
+    })
+    if (result.ok) sent += 1
+    else errors.push(`Aviso al socio: ${result.error}`)
   }
 
   return { sent, errors }

@@ -1,3 +1,4 @@
+import { findPartnerByUserId } from '@/lib/partners'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { findStaffByUserId } from '@/lib/staff'
@@ -32,6 +33,8 @@ export async function requireHost() {
   // Un colaborador (ver src/lib/staff.ts) no es anfitrión: no se le crea
   // un perfil de anfitrión, su panel es /equipo.
   if (await findStaffByUserId(user.id)) redirect('/equipo')
+  // Un socio (dueño externo, ver src/lib/partners.ts) tampoco: su panel es /socios.
+  if (await findPartnerByUserId(user.id)) redirect('/socios')
 
   const name = (user.user_metadata?.name as string | undefined) || user.email || 'Anfitrión'
 
