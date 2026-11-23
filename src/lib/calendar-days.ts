@@ -16,6 +16,51 @@ type BlockedRow = {
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
 }
 
+type BookingRow = {
+  id: string
+  guest_name: string | null
+  guest_phone: string | null
+  check_in: string
+  check_out: string
+  adults: number | null
+  children: number | null
+  infants: number | null
+  pets: boolean | null
+  guest_notes: string | null
+  booking_addons: { name: string; quantity: number | null; answers: { label: string; value: string }[] | null }[] | null
+}
+
+function shortDate(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+}
+
+/** Renglones del panel de información para una reserva hecha en el sitio. */
+function bookingLines(b: BookingRow, withContact: boolean) {
+  const nights = Math.round((Date.parse(b.check_out) - Date.parse(b.check_in)) / 86_400_000)
+  const people = [
+    `${b.adults ?? 0} adulto${b.adults === 1 ? '' : 's'}`,
+    b.children ? `${b.children} niño${b.children === 1 ? '' : 's'}` : null,
+    b.infants ? `${b.infants} bebé${b.infants === 1 ? '' : 's'}` : null,
+    b.pets ? 'con mascota' : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+  const lines = [
+    `Estancia: ${shortDate(b.check_in)} → ${shortDate(b.check_out)} (${nights} noche${nights === 1 ? '' : 's'})`,
+    `Personas: ${people}`,
+  ]
+  if (withContact && b.guest_phone) lines.push(`Teléfono: ${b.guest_phone}`)
+  for (const a of b.booking_addons ?? []) {
+    const answers = (a.answers ?? [])
+      .filter((x) => x && x.value)
+      .map((x) => `${x.label}: ${x.value}`)
+      .join(' · ')
+    lines.push(`Extra: ${a.name}${a.quantity && a.quantity > 1 ? ` ×${a.quantity}` : ''}${answers ? ` (${answers})` : ''}`)
+  }
+  if (b.guest_notes) lines.push(`Notas del huésped: ${b.guest_notes}`)
+  return lines
+}
+
 /** Supabase regresa máximo 1000 filas por consulta: aquí se pagina. */
 async function allBlocked(service: SupabaseClient, propertyIds: string[], from: string, until: string) {
   const rows: BlockedRow[] = []
@@ -43,6 +88,8 @@ export async function loadCalendarDays(
     until: string
     // Nombre del huésped en las reservas del sitio (si puede verlas).
     showBookingGuests: boolean
+    // Teléfono del huésped en las reservas del sitio (permiso aparte).
+    showGuestContact?: boolean
     // Solo las reservas por fuera de este grupo (null = todas).
     stayOwnerKey: string | null
     // Cómo se llama al anfitrión en un bloqueo sin autor.
@@ -62,15 +109,17 @@ export async function loadCalendarDays(
     opts.showBookingGuests
       ? service
           .from('bookings')
-          .select('id, guest_name')
+          .select(
+            'id, guest_name, guest_phone, check_in, check_out, adults, children, infants, pets, guest_notes, booking_addons(name, quantity, answers)'
+          )
           .in('property_id', propertyIds)
           .eq('status', 'confirmed')
           .gte('check_out', from)
-      : Promise.resolve({ data: [] as { id: string; guest_name: string | null }[] }),
+      : Promise.resolve({ data: [] as BookingRow[] }),
     staysQuery,
   ])
 
-  const guestByBooking = new Map((bookings ?? []).map((b) => [b.id as string, (b.guest_name as string | null) ?? '']))
+  const bookingById = new Map(((bookings ?? []) as unknown as BookingRow[]).map((b) => [b.id, b]))
   const stayById = new Map(((stays ?? []) as ManualStay[]).map((s) => [s.id, s]))
 
   for (const row of blocked) {
@@ -90,14 +139,17 @@ export async function loadCalendarDays(
       days[row.date] = {
         kind: 'manual',
         label: `Bloqueado${row.blocked_by ? ` por ${row.blocked_by}` : ` por ${opts.hostLabel}`}${row.note ? ` — ${row.note}` : ''}`,
-        tag: row.blocked_by ? row.blocked_by.split(' ')[0] : opts.hostLabel.split(' ')[0],
+        tag: row.blocked_by ? row.blocked_by.split(' ')[0] : 'Anfitrión',
       }
     } else if (row.source === 'booking') {
-      const guest = row.booking_id ? guestByBooking.get(row.booking_id) : undefined
+      const b = row.booking_id ? bookingById.get(row.booking_id) : undefined
+      const guest = b?.guest_name ?? ''
       days[row.date] = {
         kind: 'booking',
         label: guest ? `Reserva en el sitio — ${guest}` : 'Reserva en el sitio',
         tag: guest ? guest.split(' ')[0] : 'Reserva',
+        details: b ? bookingLines(b, Boolean(opts.showGuestContact)) : undefined,
+        phone: b && opts.showGuestContact ? b.guest_phone : null,
       }
     } else {
       const platform = src?.label ?? src?.platform ?? 'otra plataforma'
