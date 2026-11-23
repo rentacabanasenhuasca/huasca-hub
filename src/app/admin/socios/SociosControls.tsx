@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { approvePartnerProperty, markPartnerPayout, setPartnerAccountStatus, verifyPartnerBank } from './actions'
+import { approvePartnerProperty, deletePartner, markPartnerPayout, setPartnerAccountStatus, verifyPartnerBank } from './actions'
 
 function useAction() {
   const router = useRouter()
@@ -75,6 +75,27 @@ export function AccountStatusButton({ partnerId, status }: { partnerId: string; 
         className={`${btn} border ${suspend ? 'border-burnt-orange/30 text-burnt-orange' : 'border-emerald-300 text-emerald-700'}`}
       >
         {suspend ? 'Suspender' : 'Reactivar'}
+      </button>
+      {msg && <span className="ml-2 text-xs text-burnt-orange">{msg}</span>}
+    </span>
+  )
+}
+
+export function DeletePartnerButton({ partnerId, name }: { partnerId: string; name: string }) {
+  const { pending, msg, run } = useAction()
+  return (
+    <span>
+      <button
+        disabled={pending}
+        onClick={() =>
+          run(
+            () => deletePartner(partnerId),
+            `¿Borrar a ${name} por completo? Se borra su cuenta, el acceso de su equipo y sus documentos, y sus cabañas salen del sitio. Esto no se puede deshacer.`
+          )
+        }
+        className={`${btn} border border-burnt-orange/40 bg-burnt-orange/10 text-burnt-orange`}
+      >
+        Borrar socio
       </button>
       {msg && <span className="ml-2 text-xs text-burnt-orange">{msg}</span>}
     </span>
