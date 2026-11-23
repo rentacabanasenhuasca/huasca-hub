@@ -24,6 +24,7 @@ import { recomputeCalendarRange } from '@/lib/calendar'
 import { todayInMexicoStr } from '@/lib/dates'
 import { guessPlatform } from '@/lib/ical'
 import { syncOneIcalSource } from '@/lib/ical-sync'
+import { cleanGuest, createStay, type GuestInput } from '@/lib/manual-stays'
 import { SITE_URL } from '@/lib/site'
 
 type Result = { error: string | null }
@@ -362,7 +363,8 @@ export async function partnerSetBlock(
   propertyId: string,
   dates: string[],
   blocked: boolean,
-  note?: string | null
+  note?: string | null,
+  guestInput?: GuestInput | null
 ): Promise<{ error: string | null }> {
   const partner = await requirePartner()
   const property = await partnerProperty(partner.id, propertyId)
@@ -381,12 +383,38 @@ export async function partnerSetBlock(
       .eq('property_id', propertyId)
       .in('date', clean)
     const taken = new Set((existing ?? []).filter((r) => r.source !== 'manual').map((r) => r.date))
-    const rows = clean
-      .filter((d) => !taken.has(d))
-      .map((date) => ({ property_id: propertyId, date, source: 'manual' as const, note: note?.trim() || null, blocked_by: who }))
-    if (rows.length === 0) return { error: 'Esas fechas ya están ocupadas por una reserva o por otra plataforma.' }
+    const free = clean.filter((d) => !taken.has(d))
+    if (free.length === 0) return { error: 'Esas fechas ya están ocupadas por una reserva o por otra plataforma.' }
+
+    // Reserva por fuera: se guardan los datos del huésped (solo los ven el
+    // socio, su equipo y el anfitrión).
+    const guest = cleanGuest(guestInput)
+    let stayId: string | null = null
+    if (guest) {
+      const stay = await createStay(service, {
+        propertyId,
+        dates: free,
+        guest,
+        createdBy: who,
+        ownerKey: `partner:${partner.id}`,
+        partnerId: partner.id,
+      })
+      if (stay.error) return { error: `No se pudieron guardar los datos del huésped: ${stay.error}` }
+      stayId = stay.id
+    }
+    const rows = free.map((date) => ({
+      property_id: propertyId,
+      date,
+      source: 'manual' as const,
+      note: note?.trim() || null,
+      blocked_by: who,
+      stay_id: stayId,
+    }))
     const { error } = await service.from('blocked_dates').upsert(rows, { onConflict: 'property_id,date' })
-    if (error) return { error: `No se pudo bloquear: ${error.message}` }
+    if (error) {
+      if (stayId) await service.from('manual_stays').delete().eq('id', stayId)
+      return { error: `No se pudo bloquear: ${error.message}` }
+    }
   } else {
     // Marca quién desbloquea para el historial del calendario.
     await service.from('blocked_dates').update({ blocked_by: who }).eq('property_id', propertyId).eq('source', 'manual').in('date', clean)
