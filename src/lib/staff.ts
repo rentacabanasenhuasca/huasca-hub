@@ -20,6 +20,12 @@ export type StaffMember = {
   can_block_dates: boolean
   can_view_bookings: boolean
   can_view_guest_contact: boolean
+  // Puede crear usuarios para su propia gente (limpieza, encargado), solo
+  // en sus propiedades y con permisos iguales o menores a los suyos.
+  can_manage_team: boolean
+  // Si lo creó otro colaborador o un socio (en vez del anfitrión).
+  created_by_staff_id: string | null
+  created_by_partner_id: string | null
   active: boolean
 }
 
@@ -63,4 +69,13 @@ export async function requireStaff(): Promise<StaffContext> {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return { ...staff, properties }
+}
+
+/**
+ * Grupo al que pertenece un colaborador, para decidir qué datos de huéspedes
+ * (manual_stays.owner_key) puede ver: el suyo y el de su "jefe".
+ */
+export function staffOwnerKey(staff: Pick<StaffMember, 'id' | 'created_by_staff_id' | 'created_by_partner_id'>) {
+  if (staff.created_by_partner_id) return `partner:${staff.created_by_partner_id}`
+  return `staff:${staff.created_by_staff_id ?? staff.id}`
 }
