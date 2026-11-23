@@ -107,7 +107,7 @@ export default async function CalendarioPage({
     propertyIds.length > 0
       ? supabase
           .from('blocked_dates')
-          .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label), manual_stays(check_in, check_out, guest_name, guest_phone, guests, amount_mxn, channel, notes, created_by, created_at)')
+          .select('property_id, date, source, note, blocked_by, booking_id, external_summary, created_at, ical_sources(platform, label), manual_stays(check_in, check_out, guest_name, guest_phone, guests, amount_mxn, paid_mxn, balance_mxn, channel, notes, created_by, created_at)')
           .in('property_id', propertyIds)
           .gte('date', start)
           .lte('date', end)
