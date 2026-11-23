@@ -4,7 +4,7 @@ import { requirePartner, partnerProperty } from '@/lib/partners'
 import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import StaffCalendar, { type DayInfo } from '@/app/equipo/StaffCalendar'
-import { partnerSetBlock } from '../../../../actions'
+import { partnerMoveStay, partnerSetBlock, partnerUpdateStayPayment } from '../../../../actions'
 import { STAY_COLUMNS, stayLines, type ManualStay } from '@/lib/manual-stays'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +20,14 @@ export default async function CalendarioSocioPage({ params }: { params: Promise<
   const { id } = await params
   const property = await partnerProperty(partner.id, id)
   if (!property) notFound()
+  // Otras cabañas del socio, para poder mover una reserva por fuera entre ellas.
+  const { data: others } = await createServiceClient()
+    .from('properties')
+    .select('id, name')
+    .eq('partner_id', partner.id)
+    .neq('id', id)
+    .neq('partner_state', 'removed')
+    .order('name')
 
   const today = todayInMexicoStr()
   const service = createServiceClient()
@@ -46,6 +54,7 @@ export default async function CalendarioSocioPage({ params }: { params: Promise<
         label: `Reserva por fuera — ${stay.guest_name}${row.note ? ` (${row.note})` : ''}`,
         tag: stay.guest_name.split(' ')[0],
         details: stayLines(stay),
+        stay: { id: stay.id, paid: stay.paid_mxn, balance: stay.balance_mxn },
         phone: stay.guest_phone,
       }
     else if (row.source === 'manual')
@@ -70,7 +79,15 @@ export default async function CalendarioSocioPage({ params }: { params: Promise<
           anota los datos del huésped: los verás al tocar el día.
         </p>
       </div>
-      <StaffCalendar propertyId={id} today={today} days={days} canBlock setBlock={partnerSetBlock} />
+      <StaffCalendar
+        propertyId={id}
+        today={today}
+        days={days}
+        canBlock
+        setBlock={partnerSetBlock}
+        stayActions={{ updatePayment: partnerUpdateStayPayment, move: partnerMoveStay }}
+        moveTargets={(others ?? []).map((o) => ({ id: o.id as string, name: o.name as string }))}
+      />
     </div>
   )
 }
