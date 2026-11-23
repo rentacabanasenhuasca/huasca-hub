@@ -3,13 +3,34 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { staffSetBlock } from './actions'
+import type { GuestInput } from '@/lib/manual-stays'
+
+const CHANNELS = ['WhatsApp / directo', 'Airbnb', 'Booking', 'Recomendación', 'Otro']
 
 // Cuántos meses se muestran a la vez (todo el horizonte cargado: ~13 meses).
 const MONTHS_SHOWN = 13
 
 // tag: texto corto que se ve dentro del día (quién bloqueó o "Reserva"); solo
 // en reservas y bloqueos manuales. label: el detalle completo al tocar el día.
-export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string; tag?: string }
+// details: renglones extra (datos del huésped de una reserva por fuera);
+// phone: para el botón de WhatsApp.
+export type DayInfo = { kind: 'manual' | 'booking' | 'external'; label: string; tag?: string; details?: string[]; phone?: string | null }
+
+type SetBlock = (
+  propertyId: string,
+  dates: string[],
+  blocked: boolean,
+  note?: string | null,
+  guest?: GuestInput | null
+) => Promise<{ error: string | null }>
+
+function waHref(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  return `https://wa.me/${digits.length === 10 ? `52${digits}` : digits}`
+}
+
+const fieldCls =
+  'w-full rounded-lg border border-stone/25 bg-white px-3 py-2 text-sm text-navy-deep focus:border-gold focus:outline-none'
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
@@ -54,11 +75,14 @@ export default function StaffCalendar({
   canBlock: boolean
   // Acción que bloquea/libera días. Por defecto la del panel de colaboradores;
   // el panel de socios (/socios) pasa la suya.
-  setBlock?: (propertyId: string, dates: string[], blocked: boolean, note?: string | null) => Promise<{ error: string | null }>
+  setBlock?: SetBlock
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
+  // Datos del huésped (opcional): para bloqueos que son una reserva por fuera.
+  const [withGuest, setWithGuest] = useState(false)
+  const [guest, setGuest] = useState({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', channel: CHANNELS[0], notes: '' })
   const [message, setMessage] = useState<string | null>(null)
   // Último día ocupado que se tocó, para mostrar quién/qué lo bloqueó.
   const [focused, setFocused] = useState<string | null>(null)
@@ -86,8 +110,23 @@ export default function StaffCalendar({
   function apply(blocked: boolean) {
     const dates = blocked ? selectedFree : selectedManual
     if (dates.length === 0) return
+    if (blocked && withGuest && !guest.guest_name.trim()) {
+      setMessage('Escribe al menos el nombre del huésped (o quita la opción de reserva).')
+      return
+    }
+    const guestData: GuestInput | null =
+      blocked && withGuest
+        ? {
+            guest_name: guest.guest_name,
+            guest_phone: guest.guest_phone,
+            guests: guest.guests ? Number(guest.guests) : null,
+            amount_mxn: guest.amount_mxn ? Number(guest.amount_mxn) : null,
+            channel: guest.channel,
+            notes: guest.notes,
+          }
+        : null
     startTransition(async () => {
-      const r = await setBlock(propertyId, dates, blocked, note)
+      const r = await setBlock(propertyId, dates, blocked, note, guestData)
       if (r.error) {
         setMessage(r.error)
         return
@@ -95,6 +134,8 @@ export default function StaffCalendar({
       setMessage(blocked ? `Listo: ${dates.length} día(s) bloqueado(s).` : `Listo: ${dates.length} día(s) liberado(s).`)
       setSelected(new Set())
       setNote('')
+      setWithGuest(false)
+      setGuest({ guest_name: '', guest_phone: '', guests: '', amount_mxn: '', channel: CHANNELS[0], notes: '' })
       router.refresh()
     })
   }
@@ -167,6 +208,68 @@ export default function StaffCalendar({
               : ''}
           </p>
           {selectedFree.length > 0 && (
+            <label className="flex items-center gap-2 text-sm text-navy-deep">
+              <input
+                type="checkbox"
+                checked={withGuest}
+                onChange={(e) => setWithGuest(e.target.checked)}
+                className="h-4 w-4 accent-[#c9a227]"
+              />
+              Es una reserva: agregar datos del huésped
+            </label>
+          )}
+          {selectedFree.length > 0 && withGuest && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                value={guest.guest_name}
+                onChange={(e) => setGuest({ ...guest, guest_name: e.target.value })}
+                placeholder="Nombre del huésped *"
+                maxLength={120}
+                className={fieldCls}
+              />
+              <input
+                value={guest.guest_phone}
+                onChange={(e) => setGuest({ ...guest, guest_phone: e.target.value })}
+                placeholder="WhatsApp (10 dígitos)"
+                inputMode="tel"
+                className={fieldCls}
+              />
+              <input
+                value={guest.guests}
+                onChange={(e) => setGuest({ ...guest, guests: e.target.value.replace(/\D/g, '') })}
+                placeholder="¿Cuántas personas?"
+                inputMode="numeric"
+                className={fieldCls}
+              />
+              <input
+                value={guest.amount_mxn}
+                onChange={(e) => setGuest({ ...guest, amount_mxn: e.target.value.replace(/[^\d.]/g, '') })}
+                placeholder="Monto cobrado (MXN)"
+                inputMode="decimal"
+                className={fieldCls}
+              />
+              <select
+                value={guest.channel}
+                onChange={(e) => setGuest({ ...guest, channel: e.target.value })}
+                className={fieldCls}
+              >
+                {CHANNELS.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                value={guest.notes}
+                onChange={(e) => setGuest({ ...guest, notes: e.target.value })}
+                placeholder="Notas (hora de llegada, mascota, anticipo…)"
+                maxLength={500}
+                className={fieldCls}
+              />
+              <p className="sm:col-span-2 text-[11px] text-stone">
+                Estos datos solo los ven tú, tu equipo y el anfitrión. No se mandan a Airbnb ni se ven en el sitio.
+              </p>
+            </div>
+          )}
+          {selectedFree.length > 0 && (
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -207,7 +310,7 @@ export default function StaffCalendar({
         </div>
       )}
       {focused && days[focused] && (
-        <p className="mt-3 rounded-lg bg-cream px-3 py-2 text-sm text-navy-deep">
+        <div className="mt-3 rounded-lg bg-cream px-3 py-2 text-sm text-navy-deep">
           <span className="font-medium capitalize">
             {new Date(`${focused}T12:00:00Z`).toLocaleDateString('es-MX', {
               weekday: 'long',
@@ -218,7 +321,26 @@ export default function StaffCalendar({
             :
           </span>{' '}
           {days[focused].label}
-        </p>
+          {days[focused].details && (
+            <span className="mt-1.5 block space-y-0.5 text-stone">
+              {days[focused].details!.map((line, i) => (
+                <span key={i} className="block">
+                  {line}
+                </span>
+              ))}
+            </span>
+          )}
+          {days[focused].phone && (
+            <a
+              href={waHref(days[focused].phone!)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block rounded-full bg-[#25D366] px-3 py-1 text-xs font-medium text-white"
+            >
+              Escribir por WhatsApp
+            </a>
+          )}
+        </div>
       )}
       {message && <p className="mt-3 text-sm text-stone">{message}</p>}
     </div>
