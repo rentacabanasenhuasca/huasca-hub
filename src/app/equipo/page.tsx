@@ -54,6 +54,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         from: today,
         until,
         showBookingGuests: staff.can_view_bookings,
+        showGuestContact: staff.can_view_bookings && staff.can_view_guest_contact,
         stayOwnerKey: staff.can_view_bookings ? null : staffOwnerKey(staff),
         hostLabel: 'el anfitrión',
       }),
