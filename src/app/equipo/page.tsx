@@ -161,7 +161,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
       const guest = row.booking_id ? guestByBooking.get(row.booking_id) : undefined
       days[row.date] = {
         kind: 'booking',
-        label: guest ? `Reserva en el sitio — ${guest}` : 'Reserva en el sitio',
+        label: guest ? `Reserva — ${guest}` : 'Reservado',
         tag: 'Reserva',
       }
     }
