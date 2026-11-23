@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import { loadCalendarDays } from '@/lib/calendar-days'
 import MultiCalendar from '@/app/equipo/MultiCalendar'
-import { partnerSetBlock } from '../../actions'
+import { partnerMoveStay, partnerSetBlock, partnerUpdateStayPayment } from '../../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,6 +69,7 @@ export default async function SocioCalendarioPage() {
         days={days}
         canBlock
         setBlock={partnerSetBlock}
+        stayActions={{ updatePayment: partnerUpdateStayPayment, move: partnerMoveStay }}
       />
     </div>
   )
