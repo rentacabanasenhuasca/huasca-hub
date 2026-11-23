@@ -56,6 +56,25 @@ type BlockedDate = {
   created_at?: string | null
   external_summary: string | null
   ical_sources: { platform: string; label: string } | { platform: string; label: string }[] | null
+  // Datos del huésped que anotó el colaborador/socio al bloquear (reserva por fuera).
+  manual_stays?: ManualStayInfo | ManualStayInfo[] | null
+}
+type ManualStayInfo = {
+  check_in: string
+  check_out: string
+  guest_name: string
+  guest_phone: string | null
+  guests: number | null
+  amount_mxn: number | null
+  channel: string | null
+  notes: string | null
+  created_by: string
+  created_at: string
+}
+function stayOf(b: BlockedDate | null | undefined): ManualStayInfo | null {
+  const s = b?.manual_stays
+  if (!s) return null
+  return Array.isArray(s) ? (s[0] ?? null) : s
 }
 type MinNightsOverride = { property_id: string; date: string; min_nights: number }
 type MinGuestsOverride = { property_id: string; date: string; min_guests: number }
@@ -1885,6 +1904,40 @@ export default function CalendarGrid({
                       <dd className="text-navy-deep">{blocked.note}</dd>
                     </div>
                   )}
+                  {(() => {
+                    const stay = stayOf(blocked)
+                    if (!stay) return null
+                    const nights = Math.round((Date.parse(stay.check_out) - Date.parse(stay.check_in)) / 86_400_000)
+                    const digits = (stay.guest_phone ?? '').replace(/\D/g, '')
+                    return (
+                      <div className="rounded-lg bg-cream/70 p-3 space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-stone">Reserva por fuera</p>
+                        <p className="text-navy-deep">
+                          <span className="font-medium">{stay.guest_name}</span>
+                          {stay.guests ? ` · ${stay.guests} persona(s)` : ''}
+                        </p>
+                        <p className="text-stone">
+                          {stay.check_in} → {stay.check_out} ({nights} noche{nights === 1 ? '' : 's'})
+                          {stay.amount_mxn ? ` · $${Math.round(stay.amount_mxn).toLocaleString('es-MX')}` : ''}
+                          {stay.channel ? ` · ${stay.channel}` : ''}
+                        </p>
+                        {stay.notes && <p className="text-stone">Notas: {stay.notes}</p>}
+                        {stay.guest_phone && (
+                          <a
+                            href={`https://wa.me/${digits.length === 10 ? `52${digits}` : digits}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block rounded-full bg-[#25D366] px-3 py-1 text-xs font-medium text-white"
+                          >
+                            WhatsApp {stay.guest_phone}
+                          </a>
+                        )}
+                        <p className="text-xs text-stone">
+                          Lo agregó <span className="font-medium text-navy-deep">{stay.created_by}</span> el {formatLogTime(stay.created_at)}
+                        </p>
+                      </div>
+                    )
+                  })()}
                 </div>
               ) : (
                 <p className="text-sm text-stone">Bloqueado por un calendario externo sincronizado.</p>
