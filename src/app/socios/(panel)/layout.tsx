@@ -23,6 +23,7 @@ export default async function SociosLayout({ children }: { children: React.React
           </div>
           <nav className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
             <Link href="/socios" className="hover:text-gold-light">Mis cabañas</Link>
+            <Link href="/socios/calendario" className="hover:text-gold-light">Calendario</Link>
             <Link href="/socios/equipo" className="hover:text-gold-light">Mi equipo</Link>
             <Link href="/socios/datos" className="hover:text-gold-light">Datos de pago</Link>
             <Link href="/socios/terminos" className="hover:text-gold-light">Términos</Link>
