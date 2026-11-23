@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 import { requireStaff, staffOwnerKey } from '@/lib/staff'
 import { createServiceClient } from '@/lib/supabase/service'
 import { cleanGuest, createStay, type GuestInput } from '@/lib/manual-stays'
+import { loadStay, moveStay, updateStayPayment } from '@/lib/manual-stays-ops'
 import { guessPlatform } from '@/lib/ical'
 import { syncOneIcalSource } from '@/lib/ical-sync'
 
@@ -154,4 +155,34 @@ export async function staffDeleteIcal(propertyId: string, sourceId: string) {
   await service.from('blocked_dates').delete().eq('property_id', propertyId).eq('ical_source_id', sourceId)
   revalidatePath('/equipo')
   revalidatePath('/admin/calendario')
+}
+
+// ---- Reservas por fuera: pago y cambio de cabaña ------------------------------
+async function staffStay(stayId: string) {
+  const staff = await requireStaff()
+  if (!staff.can_block_dates) return null
+  const service = createServiceClient()
+  const stay = await loadStay(service, stayId)
+  if (!stay || !staff.properties.some((p) => p.id === stay.property_id)) return null
+  if (!staff.can_view_bookings && stay.owner_key !== staffOwnerKey(staff)) return null
+  return { staff, service, stay }
+}
+
+export async function staffUpdateStayPayment(stayId: string, paid: number | null, balance: number | null): Promise<Result> {
+  const ctx = await staffStay(stayId)
+  if (!ctx) return { error: 'No puedes cambiar esa reserva.' }
+  const r = await updateStayPayment(ctx.service, stayId, paid, balance)
+  revalidatePath('/equipo')
+  revalidatePath('/admin/calendario')
+  return r
+}
+
+export async function staffMoveStay(stayId: string, targetPropertyId: string): Promise<Result> {
+  const ctx = await staffStay(stayId)
+  if (!ctx) return { error: 'No puedes mover esa reserva.' }
+  if (!ctx.staff.properties.some((p) => p.id === targetPropertyId)) return { error: 'No tienes acceso a esa cabaña.' }
+  const r = await moveStay(ctx.service, stayId, targetPropertyId, ctx.staff.name)
+  revalidatePath('/equipo')
+  revalidatePath('/admin/calendario')
+  return r
 }
