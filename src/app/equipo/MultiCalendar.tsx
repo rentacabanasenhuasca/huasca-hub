@@ -58,7 +58,7 @@ function longDate(date: string) {
 }
 
 const key = (propertyId: string, date: string) => `${propertyId}|${date}`
-const EMPTY_GUEST = { guest_name: '', guest_phone: '', guests: '', amount_mxn: '', channel: CHANNELS[0], notes: '' }
+const EMPTY_GUEST = { guest_name: '', guest_phone: '', guests: '', amount_mxn: '', paid_mxn: '', balance_mxn: '', channel: CHANNELS[0], notes: '' }
 
 export default function MultiCalendar({
   properties,
@@ -136,6 +136,8 @@ export default function MultiCalendar({
             guest_phone: guest.guest_phone,
             guests: guest.guests ? Number(guest.guests) : null,
             amount_mxn: guest.amount_mxn ? Number(guest.amount_mxn) : null,
+            paid_mxn: guest.paid_mxn !== '' ? Number(guest.paid_mxn) : null,
+            balance_mxn: guest.balance_mxn !== '' ? Number(guest.balance_mxn) : null,
             channel: guest.channel,
             notes: guest.notes,
           }
@@ -324,6 +326,20 @@ export default function MultiCalendar({
                 onChange={(e) => setGuest({ ...guest, guests: e.target.value.replace(/\D/g, '') })}
                 placeholder="¿Cuántas personas?"
                 inputMode="numeric"
+                className={fieldCls}
+              />
+              <input
+                value={guest.paid_mxn}
+                onChange={(e) => setGuest({ ...guest, paid_mxn: e.target.value.replace(/[^\d.]/g, '') })}
+                placeholder="¿Cuánto ya pagó? (MXN)"
+                inputMode="decimal"
+                className={fieldCls}
+              />
+              <input
+                value={guest.balance_mxn}
+                onChange={(e) => setGuest({ ...guest, balance_mxn: e.target.value.replace(/[^\d.]/g, '') })}
+                placeholder="¿Cuánto debe? (0 = ya pagó todo)"
+                inputMode="decimal"
                 className={fieldCls}
               />
               <select value={guest.channel} onChange={(e) => setGuest({ ...guest, channel: e.target.value })} className={fieldCls}>
