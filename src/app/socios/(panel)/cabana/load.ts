@@ -42,4 +42,5 @@ export const EMPTY_VALUES: PartnerPropertyValues = {
   partner_price_weekend: '',
   amenity_ids: [],
   photos: [],
+  bed_rows: [],
 }
