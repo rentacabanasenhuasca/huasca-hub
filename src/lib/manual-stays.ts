@@ -121,7 +121,6 @@ export function stayLines(stay: Pick<ManualStay, 'check_in' | 'check_out' | 'gue
     `Estancia: ${shortDate(stay.check_in)} → ${shortDate(stay.check_out)} (${nights} noche${nights === 1 ? '' : 's'})`,
   ]
   if (stay.guest_phone) lines.push(`WhatsApp: ${stay.guest_phone}`)
-  if (stay.amount_mxn) lines.push(`Monto: ${mxn(stay.amount_mxn)}`)
   if (stay.channel) lines.push(`Canal: ${stay.channel}`)
   if (stay.notes) lines.push(`Notas: ${stay.notes}`)
   lines.push(
