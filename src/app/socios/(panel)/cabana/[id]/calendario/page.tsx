@@ -55,7 +55,7 @@ export default async function CalendarioSocioPage({ params }: { params: Promise<
         tag: row.blocked_by ? row.blocked_by.split(' ')[0] : 'HR',
       }
     else if (row.source === 'booking')
-      days[row.date] = { kind: 'booking', label: `Reserva en Huasca Retreats — ${guest.get(row.booking_id ?? '') ?? 'huésped'}`, tag: 'Reserva' }
+      days[row.date] = { kind: 'booking', label: `Reserva — ${guest.get(row.booking_id ?? '') ?? 'huésped'}`, tag: 'Reserva' }
     else days[row.date] = { kind: 'external', label: `Ocupado en ${src?.label ?? src?.platform ?? 'otra plataforma'}` }
   }
 
