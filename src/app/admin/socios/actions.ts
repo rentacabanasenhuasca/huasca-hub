@@ -76,6 +76,62 @@ export async function setPartnerAccountStatus(partnerId: string, status: 'active
   return { error: null }
 }
 
+// Borrar a un socio por completo: su cuenta, su acceso, el de su equipo y sus
+// documentos. Sus cabañas se archivan (salen del sitio) y las reservas pasadas
+// se quedan en el historial. No se puede si tiene reservas por venir o pagos
+// pendientes: primero hay que resolverlos.
+export async function deletePartner(partnerId: string): Promise<Result> {
+  await requireHost()
+  const service = createServiceClient()
+  const { data: partner } = await service.from('partners').select('id, user_id, name').eq('id', partnerId).maybeSingle()
+  if (!partner) return { error: 'No se encontró el socio.' }
+
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+  const { data: props } = await service.from('properties').select('id').eq('partner_id', partnerId)
+  const propIds = (props ?? []).map((p) => p.id as string)
+  if (propIds.length > 0) {
+    const { count: upcoming } = await service
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .in('property_id', propIds)
+      .eq('status', 'confirmed')
+      .gte('check_out', today)
+    if (upcoming) {
+      return { error: `Tiene ${upcoming} reserva(s) por venir. Cancélalas o muévelas a otra cabaña antes de borrarlo.` }
+    }
+  }
+  const { count: unpaid } = await service
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('partner_id', partnerId)
+    .eq('status', 'confirmed')
+    .is('partner_paid_at', null)
+    .gt('partner_payout_mxn', 0)
+  if (unpaid) return { error: `Tienes ${unpaid} pago(s) pendientes con este socio. Márcalos como pagados antes de borrarlo.` }
+
+  // Sus cabañas salen del sitio y se archivan.
+  if (propIds.length > 0) {
+    await service
+      .from('properties')
+      .update({ status: 'draft', partner_state: 'removed', archived_at: new Date().toISOString() })
+      .in('id', propIds)
+  }
+  // Acceso de su equipo.
+  const { data: team } = await service.from('staff_members').select('user_id').eq('created_by_partner_id', partnerId)
+  for (const m of team ?? []) await service.auth.admin.deleteUser(m.user_id as string)
+  // Comprobantes bancarios.
+  const { data: docs } = await service.storage.from('partner-docs').list(partner.user_id as string)
+  if (docs?.length) await service.storage.from('partner-docs').remove(docs.map((d) => `${partner.user_id}/${d.name}`))
+
+  const { error } = await service.from('partners').delete().eq('id', partnerId)
+  if (error) return { error: `No se pudo borrar: ${error.message}` }
+  await service.auth.admin.deleteUser(partner.user_id as string)
+
+  revalidatePath('/admin/socios')
+  revalidatePath('/')
+  return { error: null }
+}
+
 export async function markPartnerPayout(bookingId: string, paid: boolean, ref: string): Promise<Result> {
   await requireHost()
   const service = createServiceClient()
