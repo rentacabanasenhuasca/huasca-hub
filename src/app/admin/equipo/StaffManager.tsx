@@ -11,16 +11,28 @@ export type StaffView = {
   can_block_dates: boolean
   can_view_bookings: boolean
   can_view_guest_contact: boolean
+  can_manage_team: boolean
+  // Nombre de quien le dio acceso, si no fuiste tú (colaborador o socio).
+  managed_by: string | null
   property_ids: string[]
 }
 
 type Property = { id: string; name: string }
 type Result = { error: string | null; ok?: boolean }
 
-const PERMISSIONS: { key: 'can_block_dates' | 'can_view_bookings' | 'can_view_guest_contact'; label: string; help: string }[] = [
+const PERMISSIONS: {
+  key: 'can_block_dates' | 'can_view_bookings' | 'can_view_guest_contact' | 'can_manage_team'
+  label: string
+  help: string
+}[] = [
   { key: 'can_block_dates', label: 'Bloquear y desbloquear fechas', help: 'Sus bloqueos se sincronizan a Airbnb.' },
   { key: 'can_view_bookings', label: 'Ver reservas', help: 'Ve las fechas y el nombre del huésped (sin montos).' },
   { key: 'can_view_guest_contact', label: 'Ver teléfono y correo del huésped', help: 'Solo aplica si puede ver reservas.' },
+  {
+    key: 'can_manage_team',
+    label: 'Dar acceso a su propio equipo',
+    help: 'Puede crear usuarios para su gente (limpieza, encargado), solo en sus propiedades y con permisos iguales o menores.',
+  },
 ]
 
 function generatePassword() {
@@ -40,7 +52,7 @@ function PermissionAndPropertyFields({
   defaults,
 }: {
   properties: Property[]
-  defaults?: Pick<StaffView, 'can_block_dates' | 'can_view_bookings' | 'can_view_guest_contact' | 'property_ids'>
+  defaults?: Pick<StaffView, 'can_block_dates' | 'can_view_bookings' | 'can_view_guest_contact' | 'can_manage_team' | 'property_ids'>
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -208,6 +220,7 @@ function StaffCard({ member, properties }: { member: StaffView; properties: Prop
             )}
           </p>
           <p className="text-sm text-stone">{member.email}</p>
+          {member.managed_by && <p className="text-xs text-gold">Equipo de {member.managed_by}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setEditingState((v) => !v)} className={btnCls}>
