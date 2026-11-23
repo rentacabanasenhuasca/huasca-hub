@@ -229,6 +229,28 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
   }
 
   // Amenidades y fotos (se reemplazan completas, como en el panel del anfitrión).
+  // Cuartos y camas (mismo formato que el formulario del anfitrión).
+  const bedTypes = formData.getAll('bed_type').map(String)
+  const roomTypes = formData.getAll('bed_room_type').map(String)
+  const roomNumbers = formData.getAll('bed_room_number').map(String)
+  const quantities = formData.getAll('bed_quantity').map(String)
+  const bedRows = bedTypes
+    .map((bedType, i) => {
+      const special = roomTypes[i] === 'altillo_tapanco' || roomTypes[i] === 'otro'
+      return {
+        property_id: id!,
+        room_type: special ? roomTypes[i] : 'recamara',
+        room_number: special ? null : Math.min(12, Math.max(1, Number(roomNumbers[i]) || 1)),
+        bed_type: bedType.slice(0, 30),
+        quantity: Math.min(20, Math.max(1, Number(quantities[i]) || 1)),
+        sort_order: i,
+      }
+    })
+    .filter((r) => ['individual', 'matrimonial', 'queen', 'king', 'litera', 'cuna', 'sofa_cama'].includes(r.bed_type))
+    .slice(0, 40)
+  await service.from('property_beds').delete().eq('property_id', id!)
+  if (bedRows.length > 0) await service.from('property_beds').insert(bedRows)
+
   await service.from('property_amenities').delete().eq('property_id', id)
   if (amenityIds.length > 0) {
     await service.from('property_amenities').insert(amenityIds.map((amenity_id) => ({ property_id: id, amenity_id })))
