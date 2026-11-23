@@ -117,6 +117,7 @@ export async function loadCalendarDays(
         label: `Reserva por fuera — ${stay.guest_name}${row.note ? ` (${row.note})` : ''}`,
         tag: stay.guest_name.split(' ')[0],
         details: stayLines(stay),
+        stay: { id: stay.id, paid: stay.paid_mxn, balance: stay.balance_mxn },
         phone: stay.guest_phone,
       }
     } else if (row.source === 'manual') {
