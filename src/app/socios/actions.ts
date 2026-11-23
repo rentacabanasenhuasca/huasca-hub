@@ -25,6 +25,7 @@ import { todayInMexicoStr } from '@/lib/dates'
 import { guessPlatform } from '@/lib/ical'
 import { syncOneIcalSource } from '@/lib/ical-sync'
 import { cleanGuest, createStay, type GuestInput } from '@/lib/manual-stays'
+import { loadStay, moveStay, updateStayPayment } from '@/lib/manual-stays-ops'
 import { SITE_URL } from '@/lib/site'
 
 type Result = { error: string | null }
@@ -498,4 +499,32 @@ export async function currentPartnerOrNull() {
     data: { user },
   } = await supabase.auth.getUser()
   return user ? findPartnerByUserId(user.id) : null
+}
+
+// ---- Reservas por fuera: pago y cambio de cabaña ------------------------------
+async function partnerStay(stayId: string) {
+  const partner = await requirePartner()
+  const service = createServiceClient()
+  const stay = await loadStay(service, stayId)
+  if (!stay || !(await partnerProperty(partner.id, stay.property_id))) return null
+  return { partner, service, stay }
+}
+
+export async function partnerUpdateStayPayment(stayId: string, paid: number | null, balance: number | null): Promise<Result> {
+  const ctx = await partnerStay(stayId)
+  if (!ctx) return { error: 'No puedes cambiar esa reserva.' }
+  const r = await updateStayPayment(ctx.service, stayId, paid, balance)
+  revalidatePath('/socios/calendario')
+  revalidatePath('/admin/calendario')
+  return r
+}
+
+export async function partnerMoveStay(stayId: string, targetPropertyId: string): Promise<Result> {
+  const ctx = await partnerStay(stayId)
+  if (!ctx) return { error: 'No puedes mover esa reserva.' }
+  if (!(await partnerProperty(ctx.partner.id, targetPropertyId))) return { error: 'Esa cabaña no es tuya.' }
+  const r = await moveStay(ctx.service, stayId, targetPropertyId, `${ctx.partner.name} (socio)`)
+  revalidatePath('/socios/calendario')
+  revalidatePath('/admin/calendario')
+  return r
 }
