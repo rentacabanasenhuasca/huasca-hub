@@ -6,6 +6,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { uuid } from '@/lib/uuid'
+import BedsEditor, { type BedValue } from '@/components/BedsEditor'
 
 type Result = { error: string | null }
 export type Amenity = { id: string; category: string; label: string }
@@ -25,6 +26,7 @@ export type PartnerPropertyValues = {
   partner_price_weekend: number | ''
   amenity_ids: string[]
   photos: string[]
+  bed_rows: BedValue[]
 }
 
 const input =
@@ -152,6 +154,18 @@ export default function PartnerPropertyForm({
         <label className="flex items-center gap-2 text-sm text-navy-deep">
           <input type="checkbox" name="pet_friendly" defaultChecked={initial.pet_friendly} /> Acepto mascotas
         </label>
+      </section>
+
+      <section className="rounded-2xl border border-stone/15 bg-white p-5 space-y-3">
+        <div>
+          <h2 className="font-medium text-navy-deep">Cuartos y camas</h2>
+          <p className="text-xs text-stone mt-1">
+            Pon cada cama y en qué recámara está (o si está en un altillo/tapanco), para que el huésped sepa exactamente cómo van a dormir.
+            Si una recámara tiene camas distintas (por ejemplo 1 king y 1 individual), agrega una fila por cada tipo y elige la misma
+            recámara.
+          </p>
+        </div>
+        <BedsEditor initial={initial.bed_rows} inputClass={input} labelClass={label} />
       </section>
 
       <section className="rounded-2xl border border-stone/15 bg-white p-5 space-y-4">
