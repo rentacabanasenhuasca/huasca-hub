@@ -24,6 +24,9 @@ export type GuestInput = {
   guest_phone?: string | null
   guests?: number | null
   amount_mxn?: number | null
+  // Lo que el huésped ya pagó y lo que todavía debe (lo anota el equipo).
+  paid_mxn?: number | null
+  balance_mxn?: number | null
   channel?: string | null
   notes?: string | null
 }
@@ -37,6 +40,8 @@ export type ManualStay = {
   guest_phone: string | null
   guests: number | null
   amount_mxn: number | null
+  paid_mxn: number | null
+  balance_mxn: number | null
   channel: string | null
   notes: string | null
   owner_key: string
@@ -45,7 +50,7 @@ export type ManualStay = {
 }
 
 export const STAY_COLUMNS =
-  'id, property_id, check_in, check_out, guest_name, guest_phone, guests, amount_mxn, channel, notes, owner_key, created_by, created_at'
+  'id, property_id, check_in, check_out, guest_name, guest_phone, guests, amount_mxn, paid_mxn, balance_mxn, channel, notes, owner_key, created_by, created_at'
 
 export const STAY_CHANNELS = ['WhatsApp / directo', 'Airbnb', 'Booking', 'Recomendación', 'Otro']
 
@@ -57,11 +62,15 @@ export function cleanGuest(guest: GuestInput | null | undefined): GuestInput | n
   const phone = String(guest.guest_phone ?? '').replace(/[^\d+]/g, '').slice(0, 20) || null
   const guests = Number(guest.guests)
   const amount = Number(guest.amount_mxn)
+  const paid = Number(guest.paid_mxn)
+  const balance = Number(guest.balance_mxn)
   return {
     guest_name: name,
     guest_phone: phone,
     guests: Number.isFinite(guests) && guests > 0 ? Math.min(Math.round(guests), 99) : null,
     amount_mxn: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null,
+    paid_mxn: guest.paid_mxn !== null && guest.paid_mxn !== undefined && Number.isFinite(paid) && paid >= 0 ? Math.round(paid) : null,
+    balance_mxn: guest.balance_mxn !== null && guest.balance_mxn !== undefined && Number.isFinite(balance) && balance >= 0 ? Math.round(balance) : null,
     channel: String(guest.channel ?? '').trim().slice(0, 40) || null,
     notes: String(guest.notes ?? '').trim().slice(0, 500) || null,
   }
@@ -113,14 +122,28 @@ function shortDate(date: string) {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 }
 
+/** "Ya pagó $X · Debe $Y" (o "Pagado completo"); null si no se anotó nada. */
+export function paymentText(stay: Pick<ManualStay, 'paid_mxn' | 'balance_mxn'>) {
+  const paid = stay.paid_mxn
+  const balance = stay.balance_mxn
+  if (paid == null && balance == null) return null
+  if (balance === 0) return `Pago: pagado completo${paid ? ` (${mxn(paid)})` : ''}`
+  const parts = []
+  if (paid != null) parts.push(`ya pagó ${mxn(paid)}`)
+  if (balance != null) parts.push(`debe ${mxn(balance)}`)
+  return `Pago: ${parts.join(' · ')}`
+}
+
 /** Renglones legibles para el panel de información de un día. */
-export function stayLines(stay: Pick<ManualStay, 'check_in' | 'check_out' | 'guest_name' | 'guest_phone' | 'guests' | 'amount_mxn' | 'channel' | 'notes' | 'created_by' | 'created_at'>) {
+export function stayLines(stay: Pick<ManualStay, 'check_in' | 'check_out' | 'guest_name' | 'guest_phone' | 'guests' | 'amount_mxn' | 'paid_mxn' | 'balance_mxn' | 'channel' | 'notes' | 'created_by' | 'created_at'>) {
   const nights = Math.round((Date.parse(stay.check_out) - Date.parse(stay.check_in)) / 86_400_000)
   const lines = [
     `Huésped: ${stay.guest_name}${stay.guests ? ` · ${stay.guests} persona(s)` : ''}`,
     `Estancia: ${shortDate(stay.check_in)} → ${shortDate(stay.check_out)} (${nights} noche${nights === 1 ? '' : 's'})`,
   ]
   if (stay.guest_phone) lines.push(`WhatsApp: ${stay.guest_phone}`)
+  const pay = paymentText(stay)
+  if (pay) lines.push(pay)
   if (stay.channel) lines.push(`Canal: ${stay.channel}`)
   if (stay.notes) lines.push(`Notas: ${stay.notes}`)
   lines.push(
