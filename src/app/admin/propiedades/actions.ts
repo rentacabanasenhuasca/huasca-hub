@@ -57,6 +57,7 @@ function buildPropertyPayload(formData: FormData) {
     extra_guest_fee_mxn: num(formData, 'extra_guest_fee_mxn') ?? 0,
 
     google_maps_link: String(formData.get('google_maps_link') || '').trim() || null,
+    arrival_instructions: String(formData.get('arrival_instructions') || '').trim().slice(0, 3000) || null,
     lat: num(formData, 'lat'),
     lng: num(formData, 'lng'),
     show_exact_location: formData.get('show_exact_location') === 'on',
