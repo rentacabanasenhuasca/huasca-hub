@@ -43,7 +43,6 @@ export default function PartnerPropertyForm({
   userId,
   amenities,
   initial,
-  markupPct,
   feePct,
   submitLabel,
 }: {
@@ -51,7 +50,6 @@ export default function PartnerPropertyForm({
   userId: string
   amenities: Amenity[]
   initial: PartnerPropertyValues
-  markupPct: number
   feePct: number
   submitLabel: string
 }) {
@@ -112,7 +110,6 @@ export default function PartnerPropertyForm({
     return acc
   }, {})
 
-  const guest = (p: number | '') => (p ? Math.round((p * (1 + markupPct / 100)) / 10) * 10 : 0)
   const net = (p: number | '') => (p ? Math.round(p * (1 - feePct / 100)) : 0)
 
   return (
@@ -280,19 +277,15 @@ export default function PartnerPropertyForm({
           <div className="rounded-xl bg-cream/70 p-3 text-xs text-stone space-y-1">
             {weekday ? (
               <p>
-                Entre semana: el huésped paga <strong className="text-navy-deep">{money(guest(weekday))}</strong> y tú recibes{' '}
-                <strong className="text-navy-deep">{money(net(weekday))}</strong> por noche.
+                Entre semana tú recibes <strong className="text-navy-deep">{money(net(weekday))}</strong> por noche.
               </p>
             ) : null}
             {weekend ? (
               <p>
-                Fin de semana: el huésped paga <strong className="text-navy-deep">{money(guest(weekend))}</strong> y tú recibes{' '}
-                <strong className="text-navy-deep">{money(net(weekend))}</strong> por noche.
+                Fin de semana tú recibes <strong className="text-navy-deep">{money(net(weekend))}</strong> por noche.
               </p>
             ) : null}
-            <p>
-              Al huésped se le suma el {markupPct}% de la plataforma y a ti se te descuenta el {feePct}% de comisión.
-            </p>
+            <p>Es tu precio menos el {feePct}% de comisión. Huasca Retreats agrega su cargo de plataforma al precio que ve el huésped.</p>
           </div>
         )}
       </section>
