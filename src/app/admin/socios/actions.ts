@@ -16,8 +16,16 @@ async function partnerOf(service: ReturnType<typeof createServiceClient>, partne
 export async function approvePartnerProperty(propertyId: string): Promise<Result> {
   await requireHost()
   const service = createServiceClient()
-  const { data: p } = await service.from('properties').select('id, name, slug, partner_id').eq('id', propertyId).maybeSingle()
+  const { data: p } = await service
+    .from('properties')
+    .select('id, name, slug, partner_id, arrival_instructions, google_maps_link')
+    .eq('id', propertyId)
+    .maybeSingle()
   if (!p?.partner_id) return { error: 'Esa cabaña no es de un socio.' }
+  // Sin indicaciones para llegar no se publica: van en el correo del huésped.
+  if (!p.google_maps_link || ((p.arrival_instructions as string | null) ?? '').trim().length < 80) {
+    return { error: 'Falta que el socio ponga su ubicación de Google Maps y cómo llegar. Pídele que edite su cabaña.' }
+  }
   const { error } = await service
     .from('properties')
     .update({ partner_state: 'active', status: 'published', partner_approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
