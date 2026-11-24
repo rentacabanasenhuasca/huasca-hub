@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { approvePartnerProperty, deletePartner, markPartnerPayout, setPartnerAccountStatus, verifyPartnerBank } from './actions'
+import { approvePartnerProperty, deletePartner, markPartnerPayout, setPartnerAccountStatus, setPartnerPricing, verifyPartnerBank } from './actions'
 
 function useAction() {
   const router = useRouter()
@@ -133,5 +133,96 @@ export function PayoutButton({ bookingId, paid, amount }: { bookingId: string; p
       </button>
       {msg && <span className="text-xs text-burnt-orange">{msg}</span>}
     </span>
+  )
+}
+
+// Precio al huésped (con tu margen), calificación y tipo de una cabaña de
+// socio. El socio no ve nada de esto.
+export function PartnerPricingRow({
+  propertyId,
+  name,
+  partnerName,
+  state,
+  partnerWeekday,
+  partnerWeekend,
+  feePct,
+  markupPct,
+  rating,
+  tier,
+}: {
+  propertyId: string
+  name: string
+  partnerName: string
+  state: string
+  partnerWeekday: number
+  partnerWeekend: number
+  feePct: number
+  markupPct: number
+  rating: number | null
+  tier: string | null
+}) {
+  const { pending, msg, run } = useAction()
+  const [markup, setMarkup] = useState(String(markupPct))
+  const [rate, setRate] = useState(rating != null ? String(rating) : '')
+  const [kind, setKind] = useState(tier ?? '')
+  const [saved, setSaved] = useState(false)
+  const m = Number(markup) || 0
+  const guest = (p: number) => Math.round((p * (1 + m / 100)) / 10) * 10
+  const net = (p: number) => Math.round(p * (1 - feePct / 100))
+  const money = (n: number) => `$${n.toLocaleString('es-MX')}`
+  const field = 'rounded-lg border border-stone/25 bg-white px-2 py-1.5 text-sm text-navy-deep focus:border-gold focus:outline-none'
+
+  return (
+    <div className="border-t border-stone/10 pt-3 first:border-0 first:pt-0">
+      <p className="text-sm font-medium text-navy-deep">
+        {name} <span className="text-xs font-normal text-stone">· {partnerName} · {state}</span>
+      </p>
+      <div className="mt-1 grid gap-1 text-xs text-stone sm:grid-cols-2">
+        <p>
+          Entre semana: socio <strong className="text-navy-deep">{money(partnerWeekday)}</strong> → huésped{' '}
+          <strong className="text-navy-deep">{money(guest(partnerWeekday))}</strong> · le pagas {money(net(partnerWeekday))} · te quedan{' '}
+          <strong className="text-emerald-700">{money(guest(partnerWeekday) - net(partnerWeekday))}</strong>
+        </p>
+        <p>
+          Fin de semana: socio <strong className="text-navy-deep">{money(partnerWeekend)}</strong> → huésped{' '}
+          <strong className="text-navy-deep">{money(guest(partnerWeekend))}</strong> · le pagas {money(net(partnerWeekend))} · te quedan{' '}
+          <strong className="text-emerald-700">{money(guest(partnerWeekend) - net(partnerWeekend))}</strong>
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <label className="text-xs text-stone">
+          Tu margen al huésped (%)
+          <input value={markup} onChange={(e) => { setMarkup(e.target.value.replace(/[^\d.]/g, '')); setSaved(false) }} inputMode="decimal" className={`${field} block w-24`} />
+        </label>
+        <label className="text-xs text-stone">
+          Calificación (1-5)
+          <input value={rate} onChange={(e) => { setRate(e.target.value.replace(/[^\d.]/g, '')); setSaved(false) }} inputMode="decimal" placeholder="4.8" className={`${field} block w-20`} />
+        </label>
+        <label className="text-xs text-stone">
+          Tipo
+          <select value={kind} onChange={(e) => { setKind(e.target.value); setSaved(false) }} className={`${field} block`}>
+            <option value="">Sin definir</option>
+            <option value="accesible">Accesible</option>
+            <option value="media">Media</option>
+            <option value="lujo">Premium</option>
+          </select>
+        </label>
+        <button
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const r = await setPartnerPricing(propertyId, m, rate ? Number(rate) : null, kind || null)
+              if (!r.error) setSaved(true)
+              return r
+            })
+          }
+          className={`${btn} bg-navy-deep text-cream`}
+        >
+          Guardar
+        </button>
+        {saved && !pending && <span className="text-xs text-emerald-700">Guardado ✓</span>}
+        {msg && <span className="text-xs text-burnt-orange">{msg}</span>}
+      </div>
+    </div>
   )
 }
