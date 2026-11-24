@@ -80,6 +80,7 @@ export default async function EditarCabanaPage({
           location_text: parts.location,
           services_text: parts.services,
           google_maps_link: (property.google_maps_link as string | null) ?? '',
+          arrival_instructions: (property.arrival_instructions as string | null) ?? '',
           capacity: Number(property.capacity ?? 2),
           bedrooms: Number(property.bedrooms ?? 1),
           beds: Number(property.beds ?? 1),
