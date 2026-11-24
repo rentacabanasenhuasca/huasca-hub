@@ -148,6 +148,7 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
   const services = String(formData.get('services_text') || '').trim()
   const location = String(formData.get('location_text') || '').trim()
   const mapsLink = String(formData.get('google_maps_link') || '').trim()
+  const arrival = String(formData.get('arrival_instructions') || '').trim().slice(0, 3000)
   const weekday = num(formData, 'partner_price_weekday')
   const weekend = num(formData, 'partner_price_weekend')
   const minNights = Math.max(1, Math.min(30, num(formData, 'min_nights') ?? 1))
@@ -165,6 +166,12 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
   if (!name) return { error: 'Ponle nombre a tu cabaña.' }
   if (description.length < 40) return { error: 'Escribe una descripción de al menos un par de renglones.' }
   if (!location) return { error: 'Escribe la ubicación (zona, comunidad o dirección aproximada).' }
+  if (!/^https:\/\/(www\.)?(maps\.app\.goo\.gl|goo\.gl\/maps|google\.[a-z.]+\/maps|maps\.google\.[a-z.]+)/i.test(mapsLink)) {
+    return { error: 'Pega la liga de Google Maps de tu cabaña (en Maps: Compartir → Copiar vínculo).' }
+  }
+  if (arrival.length < 80) {
+    return { error: 'Explica cómo llegar con más detalle (ruta, referencias, cómo es el camino y cómo reconocer la entrada).' }
+  }
   if (!weekday || weekday < 300 || !weekend || weekend < 300) return { error: 'Pon tu precio por noche entre semana y en fin de semana.' }
   if (photoUrls.length < 3) return { error: 'Sube al menos 3 fotos de tu cabaña.' }
   const allowedPrefix = `/property-photos/partners/${partner.user_id}/`
@@ -186,6 +193,7 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
     bathrooms,
     pet_friendly: formData.get('pet_friendly') === 'on',
     google_maps_link: mapsLink || null,
+    arrival_instructions: arrival,
     min_nights: minNights,
     partner_price_weekday: weekday,
     partner_price_weekend: weekend,
