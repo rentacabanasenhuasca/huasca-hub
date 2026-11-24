@@ -35,7 +35,14 @@ type PublicProperty = {
   max_children: number | null
   max_infants: number | null
   infants_count_toward_capacity: boolean
+  admin_rating: number | null
+  price_tier: 'accesible' | 'media' | 'lujo' | null
 }
+
+// Tipo de propiedad que el huésped puede filtrar (lo define el anfitrión en
+// cada anuncio). En la base el nivel más alto se llama 'lujo'; al huésped se
+// le muestra como "Premium".
+const TIER_PARAM: Record<string, 'accesible' | 'media' | 'lujo'> = { accesible: 'accesible', media: 'media', premium: 'lujo' }
 
 export const metadata: Metadata = {
   title: { absolute: `Cabañas en Huasca de Ocampo con jacuzzi, chimenea y glamping | ${SITE_NAME}` },
@@ -56,6 +63,7 @@ export default async function Home({
     infants?: string
     pets?: string
     jacuzzi?: string
+    tipo?: string
   }>
 }) {
   const sp = await searchParams
@@ -63,13 +71,14 @@ export default async function Home({
   const guests = parseGuestsFromParams(sp)
   const hasSearch = Boolean(checkin && checkout && checkout > checkin)
   const jacuzziOnly = sp.jacuzzi === '1'
+  const tierFilter = sp.tipo ? (TIER_PARAM[sp.tipo] ?? null) : null
 
   const supabase = createServiceClient()
 
   const { data: properties } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale, hide_calendar'
+      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale, hide_calendar, admin_rating, price_tier'
     )
     .eq('status', 'published')
     .order('name')
@@ -269,6 +278,7 @@ export default async function Home({
     // se muestran con la leyenda "Selecciona mínimo N noches" (ver tarjeta).
     .filter((r) => r.fitsGuests && r.isFree)
     .filter((r) => !jacuzziOnly || jacuzziPropertyIds.has(r.property.id))
+    .filter((r) => !tierFilter || r.property.price_tier === tierFilter)
 
     // Barajamos el orden en el que se muestran las tarjetas: sin esto, como la
     // consulta viene ordenada por nombre, propiedades con nombres parecidos
@@ -351,6 +361,7 @@ export default async function Home({
               defaultCheckout={checkout}
               defaultGuests={guests}
               defaultJacuzzi={jacuzziOnly}
+              defaultTipo={sp.tipo && TIER_PARAM[sp.tipo] ? sp.tipo : ''}
             />
           </div>
         </div>
@@ -444,7 +455,14 @@ export default async function Home({
                       )}
                       {property.for_sale && <ForSaleBadge className="top-3 left-3 w-16" />}
                       <div className="p-5">
-                        <h3 className="font-display text-xl text-navy-deep">{property.name}</h3>
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-display text-xl text-navy-deep">{property.name}</h3>
+                          {property.admin_rating ? (
+                            <span className="shrink-0 text-sm font-medium text-navy-deep" aria-label={`Calificación ${Number(property.admin_rating).toFixed(1)} de 5`}>
+                              <span className="text-gold">★</span> {Number(property.admin_rating).toFixed(1)}
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-sm text-stone mt-1.5">
                           Hasta {property.capacity} huéspedes · {property.bedrooms} recámaras
                           {property.pet_friendly ? ' · Pet friendly' : ''}
