@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentPartnerOrNull, registerPartner } from '../actions'
 import RegistroForm from './RegistroForm'
-import { PARTNER_FEE_PCT, PARTNER_MARKUP_PCT } from '@/lib/partners'
+import { PARTNER_FEE_PCT } from '@/lib/partners'
 
 export const metadata: Metadata = {
   title: 'Publica tu cabaña en Huasca Retreats',
@@ -21,8 +21,8 @@ export default async function RegistroPage() {
           <p className="text-gold text-[11px] tracking-[0.25em] uppercase">Huasca Retreats · Socios</p>
           <h1 className="mt-1 text-2xl font-semibold text-navy-deep">Publica tu cabaña con nosotros</h1>
           <p className="mt-2 text-sm text-stone">
-            Recibe reservas de huéspedes de Huasca Retreats. Publicar no cuesta: al huésped se le suma un {PARTNER_MARKUP_PCT}% de cargo de
-            plataforma y a ti se te descuenta un {PARTNER_FEE_PCT}% de comisión. Te pagamos al día siguiente del check-in.
+            Recibe reservas de huéspedes de Huasca Retreats. Publicar no cuesta: tú pones tu precio y solo se te descuenta un {PARTNER_FEE_PCT}% de
+            comisión cuando hay reserva. Huasca Retreats agrega su cargo de plataforma al precio del huésped. Te pagamos al día siguiente del check-in.
           </p>
         </div>
         <ol className="rounded-2xl border border-stone/15 bg-white p-5 text-sm text-navy-deep space-y-1.5 list-decimal list-inside">
