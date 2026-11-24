@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { todayInMexicoStr } from '@/lib/dates'
 import { mxn, type Partner } from '@/lib/partners'
 import { SITE_URL } from '@/lib/site'
-import { AccountStatusButton, ApproveButton, DeletePartnerButton, PayoutButton, VerifyBankButton } from './SociosControls'
+import { AccountStatusButton, ApproveButton, DeletePartnerButton, PartnerPricingRow, PayoutButton, VerifyBankButton } from './SociosControls'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,7 @@ export default async function SociosAdminPage() {
     service.from('partners').select('*').order('created_at', { ascending: false }),
     service
       .from('properties')
-      .select('id, name, slug, partner_id, partner_state, partner_price_weekday, partner_price_weekend, weekday_price_mxn, weekend_price_mxn, min_nights, created_at')
+      .select('id, name, slug, partner_id, partner_state, partner_price_weekday, partner_price_weekend, weekday_price_mxn, weekend_price_mxn, min_nights, created_at, partner_markup_pct, partner_fee_pct, admin_rating, price_tier')
       .not('partner_id', 'is', null)
       .order('created_at'),
     service
@@ -102,6 +102,38 @@ export default async function SociosAdminPage() {
               )
             })}
           </ul>
+        )}
+      </section>
+
+      <section className={card}>
+        <h2 className="font-medium text-navy-deep mb-1">Precios, calificación y tipo</h2>
+        <p className="text-xs text-stone mb-3">
+          Aquí ves el precio que puso cada socio y decides tu margen al huésped. El socio no ve esto: en su panel solo ve su precio y lo
+          que recibe, y su pago siempre sale de su precio. Si el socio cambia su precio, se respeta tu margen. La calificación se muestra
+          en el sitio y el tipo sirve para el filtro del buscador.
+        </p>
+        {(properties ?? []).filter((p) => p.partner_state !== 'removed').length === 0 ? (
+          <p className="text-sm text-stone">Todavía no hay cabañas de socios.</p>
+        ) : (
+          <div className="space-y-3">
+            {(properties ?? [])
+              .filter((p) => p.partner_state !== 'removed')
+              .map((p) => (
+                <PartnerPricingRow
+                  key={p.id as string}
+                  propertyId={p.id as string}
+                  name={p.name as string}
+                  partnerName={byId.get(p.partner_id as string)?.name ?? 'socio'}
+                  state={STATE[p.partner_state as string] ?? (p.partner_state as string)}
+                  partnerWeekday={Number(p.partner_price_weekday)}
+                  partnerWeekend={Number(p.partner_price_weekend)}
+                  feePct={Number(p.partner_fee_pct ?? 5)}
+                  markupPct={Number(p.partner_markup_pct ?? 14)}
+                  rating={p.admin_rating == null ? null : Number(p.admin_rating)}
+                  tier={(p.price_tier as string | null) ?? null}
+                />
+              ))}
+          </div>
         )}
       </section>
 
