@@ -137,7 +137,7 @@ export default async function CabanaPage({
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale, hide_calendar'
+      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale, hide_calendar, admin_rating'
     )
     .eq(isUuid(id) ? 'id' : 'slug', id)
     .eq('status', 'published')
@@ -318,6 +318,12 @@ export default async function CabanaPage({
         <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10">
           <div>
             <h1 className="font-display text-3xl sm:text-4xl text-navy-deep">{property.name}</h1>
+            {property.admin_rating ? (
+              <p className="mt-1.5 text-sm font-medium text-navy-deep">
+                <span className="text-gold">★</span> {Number(property.admin_rating).toFixed(1)}{' '}
+                <span className="font-normal text-stone">· Calificación Huasca Retreats</span>
+              </p>
+            ) : null}
             <p className="text-sm text-stone mt-2.5">
               Hasta {property.capacity} huéspedes · {property.bedrooms} recámaras · {property.beds} camas ·{' '}
               {property.bathrooms} baños{property.pet_friendly ? ' · Pet friendly' : ''}
