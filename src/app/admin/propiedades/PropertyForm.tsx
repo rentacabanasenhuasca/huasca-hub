@@ -20,6 +20,7 @@ export type PropertyRecord = {
   weekday_price_mxn: number
   weekend_price_mxn: number
   price_tier: 'accesible' | 'media' | 'lujo' | null
+  admin_rating?: number | null
   base_occupancy: number
   extra_guest_fee_mxn: number
   google_maps_link: string | null
@@ -437,13 +438,26 @@ export default function PropertyForm({
             required
           />
           <label>
-            <span className={labelClass}>Rango de precio</span>
+            <span className={labelClass}>Tipo (filtro del buscador)</span>
             <select name="price_tier" defaultValue={property?.price_tier ?? ''} className={inputClass}>
               <option value="">Sin definir</option>
               <option value="accesible">Accesible</option>
               <option value="media">Media</option>
-              <option value="lujo">Lujo</option>
+              <option value="lujo">Premium</option>
             </select>
+          </label>
+          <label>
+            <span className={labelClass}>Calificación (1 a 5, la ve el huésped)</span>
+            <input
+              type="number"
+              name="admin_rating"
+              min={1}
+              max={5}
+              step={0.1}
+              defaultValue={property?.admin_rating ?? ''}
+              placeholder="Ej. 4.8"
+              className={inputClass}
+            />
           </label>
         </div>
         <p className="text-xs text-stone mt-2 mb-4">
