@@ -116,6 +116,32 @@ function whatsappButtonHtml(phone: string, guestName: string, propertyName: stri
 // El correo del administrador siempre lleva el botón de WhatsApp al final
 // (en todas las cabañas, también las que se creen después), a menos que la
 // plantilla ya lo coloque en otro lugar con {{guest_whatsapp_button}}.
+// Cómo llegar: se agrega solo a los correos para el huésped si la cabaña lo
+// tiene y la plantilla no lo coloca ya en otro lugar con {{arrival_block}}.
+function withArrivalBlock(template: { recipient_type: string; body: string }, block: string) {
+  if (template.recipient_type !== 'guest' || !block) return template.body
+  if (/\{\{\s*arrival_(block|instructions)\s*\}\}/.test(template.body)) return template.body
+  return `${template.body.trimEnd()}\n\n{{arrival_block}}`
+}
+
+function escapeHtmlText(t: string) {
+  return t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+}
+
+/** Bloque HTML (sin saltos de párrafo) con las indicaciones y el botón de Maps. */
+function arrivalBlockHtml(instructions: string, mapsLink: string) {
+  if (!instructions && !mapsLink) return ''
+  const text = escapeHtmlText(instructions.trim()).replace(/\r?\n/g, '<br />')
+  const safeLink = /^https:\/\//i.test(mapsLink) ? escapeHtmlText(mapsLink) : ''
+  return (
+    `<strong>📍 Cómo llegar</strong><br />` +
+    (text ? `${text}<br />` : '') +
+    (safeLink
+      ? `<br /><a href="${safeLink}" style="display:inline-block;background:#1f2a1d;color:#f3ede0;text-decoration:none;padding:10px 18px;border-radius:999px;font-weight:600;">Abrir ubicación en Google Maps</a>`
+      : '')
+  )
+}
+
 function withWhatsappButton(template: { recipient_type: string; body: string }, button: string) {
   if (template.recipient_type !== 'admin' || !button) return template.body
   if (/\{\{\s*guest_whatsapp_button\s*\}\}/.test(template.body)) return template.body
@@ -147,7 +173,7 @@ export async function sendBookingEmails(
       `id, guest_name, guest_email, guest_phone, guest_notes, check_in, check_out, adults, children, infants,
        pets, total_price_mxn, payment_provider, partner_id, partner_payout_mxn,
        partners ( name, email, phone, bank_name, bank_clabe ),
-       properties ( id, name, host_id, hosts ( name, email, phone ) )`
+       properties ( id, name, host_id, arrival_instructions, google_maps_link, hosts ( name, email, phone ) )`
     )
     .eq('id', bookingId)
     .maybeSingle()
@@ -209,6 +235,8 @@ export async function sendBookingEmails(
     host_phone: host?.phone ?? '',
     addons: addonsText,
     guest_whatsapp_link: whatsappDigits(booking.guest_phone) ? `https://wa.me/${whatsappDigits(booking.guest_phone)}` : '',
+    arrival_instructions: escapeHtmlText(((property as { arrival_instructions?: string | null }).arrival_instructions ?? '').trim()).replace(/\r?\n/g, '<br />'),
+    maps_link: (property as { google_maps_link?: string | null }).google_maps_link ?? '',
   }
   // Cabaña de socio (ver src/lib/partners.ts): al correo del administrador se
   // le agrega cuánto hay que pagarle al socio y cuándo.
@@ -246,7 +274,11 @@ export async function sendBookingEmails(
 
   // Solo para el cuerpo (HTML): el asunto es texto plano.
   const whatsappButton = whatsappButtonHtml(data.guest_phone, data.guest_name, data.property_name, data.check_in)
-  const bodyData = { ...data, guest_whatsapp_button: whatsappButton }
+  const arrivalBlock = arrivalBlockHtml(
+    (property as { arrival_instructions?: string | null }).arrival_instructions ?? '',
+    (property as { google_maps_link?: string | null }).google_maps_link ?? ''
+  )
+  const bodyData = { ...data, guest_whatsapp_button: whatsappButton, arrival_block: arrivalBlock }
 
   // templateIds: si se manda, restringe el envío a solo esos correos (ej.
   // una reserva manual donde el host eligió a mano cuáles mandar) — si no
@@ -290,7 +322,7 @@ export async function sendBookingEmails(
         renderBodyHtml(
           template.recipient_type === 'admin' && adminPartnerNote
             ? `${withWhatsappButton(template, whatsappButton).trimEnd()}\n\n${adminPartnerNote}`
-            : withWhatsappButton(template, whatsappButton),
+            : withArrivalBlock({ ...template, body: withWhatsappButton(template, whatsappButton) }, arrivalBlock),
           bodyData
         )
       ),
