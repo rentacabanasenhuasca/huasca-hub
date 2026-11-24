@@ -16,6 +16,7 @@ export type PartnerPropertyValues = {
   location_text: string
   services_text: string
   google_maps_link: string
+  arrival_instructions: string
   capacity: number
   bedrooms: number
   beds: number
@@ -207,8 +208,37 @@ export default function PartnerPropertyForm({
           />
         </div>
         <div>
-          <label className={label}>Liga de Google Maps (opcional)</label>
-          <input name="google_maps_link" defaultValue={initial.google_maps_link} className={input} placeholder="https://maps.app.goo.gl/…" />
+          <label className={label}>Ubicación exacta en Google Maps *</label>
+          <input
+            name="google_maps_link"
+            defaultValue={initial.google_maps_link}
+            required
+            className={input}
+            placeholder="https://maps.app.goo.gl/…"
+          />
+          <p className="text-xs text-stone mt-1">
+            En Google Maps busca tu cabaña (o pon un pin en la entrada), toca &quot;Compartir&quot; y copia la liga. Debe llevar
+            exactamente a la entrada.
+          </p>
+        </div>
+        <div>
+          <label className={label}>¿Cómo llegar? *</label>
+          <textarea
+            name="arrival_instructions"
+            defaultValue={initial.arrival_instructions}
+            required
+            minLength={80}
+            rows={6}
+            className={input}
+            placeholder={
+              'Ej. Desde el centro de Huasca toma la carretera a Tulancingo. A 3 km, después de la gasolinera, da vuelta a la derecha en el letrero "Rancho El Ocote". Sigue 800 m de terracería (entra cualquier auto). Portón negro con número 12, a la izquierda. Estacionamiento dentro para 2 autos. Si llegas de noche, el camino no tiene luz: maneja despacio.'
+            }
+          />
+          <p className="text-xs text-stone mt-1">
+            Esto le llega al huésped en su correo de confirmación, junto con el botón de Google Maps. Explica la ruta paso a paso con
+            referencias claras (desde el centro o la carretera principal), cómo es el camino, cómo identificar la entrada y dónde
+            estacionarse. Que pueda llegar sin tener que llamarte.
+          </p>
         </div>
       </section>
 
