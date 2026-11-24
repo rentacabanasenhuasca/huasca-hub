@@ -32,6 +32,7 @@ export const EMPTY_VALUES: PartnerPropertyValues = {
   location_text: '',
   services_text: '',
   google_maps_link: '',
+  arrival_instructions: '',
   capacity: 2,
   bedrooms: 1,
   beds: 1,
