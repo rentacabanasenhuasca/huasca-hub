@@ -208,6 +208,11 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
     const existing = await partnerProperty(partner.id, id)
     if (!existing) return { error: 'Esa cabaña no existe.' }
     if (existing.partner_state === 'removed') return { error: 'Esta cabaña fue quitada de la plataforma. Escríbenos para volver a activarla.' }
+    // El precio al huésped respeta el margen que el anfitrión haya puesto a
+    // esta cabaña (el socio no lo ve ni lo cambia).
+    const markup = Number(existing.partner_markup_pct ?? PARTNER_MARKUP_PCT)
+    payload.weekday_price_mxn = guestPrice(weekday, markup)
+    payload.weekend_price_mxn = guestPrice(weekend, markup)
     const { error } = await service.from('properties').update(payload).eq('id', id)
     if (error) return { error: `No se pudo guardar: ${error.message}` }
   } else {
@@ -281,13 +286,13 @@ export async function savePartnerProperty(propertyId: string | null, _prev: Resu
   if (isNew) {
     await notifyAdmin(`Cabaña nueva por revisar: ${name}`, [
       `<strong>${escapeHtml(partner.name)}</strong> registró la cabaña <strong>${escapeHtml(name)}</strong>.`,
-      `Precio del socio: $${weekday} entre semana / $${weekend} fin de semana.<br />El huésped verá: $${guestPrice(weekday)} / $${guestPrice(weekend)}.`,
+      `Precio del socio: $${weekday} entre semana / $${weekend} fin de semana.<br />El huésped verá: $${payload.weekday_price_mxn} / $${payload.weekend_price_mxn} (puedes cambiar tu margen en Admin → Socios).`,
       `Revísala y publícala en <a href="${SITE_URL}/admin/socios">${SITE_URL}/admin/socios</a>.`,
     ])
   } else {
     await notifyAdmin(`Un socio editó su cabaña: ${name}`, [
       `<strong>${escapeHtml(partner.name)}</strong> guardó cambios en <strong>${escapeHtml(name)}</strong>.`,
-      `Precio del socio: $${weekday} / $${weekend} (huésped: $${guestPrice(weekday)} / $${guestPrice(weekend)}). Mínimo de noches: ${minNights}.`,
+      `Precio del socio: $${weekday} / $${weekend} (huésped: $${payload.weekday_price_mxn} / $${payload.weekend_price_mxn}). Mínimo de noches: ${minNights}.`,
       `Puedes revisarla en <a href="${SITE_URL}/admin/propiedades/${id}">${SITE_URL}/admin/propiedades/${id}</a>.`,
     ])
   }
