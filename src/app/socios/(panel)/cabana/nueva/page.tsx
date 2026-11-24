@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requirePartner, PARTNER_FEE_PCT, PARTNER_MARKUP_PCT } from '@/lib/partners'
+import { requirePartner, PARTNER_FEE_PCT } from '@/lib/partners'
 import { savePartnerProperty } from '../../../actions'
 import PartnerPropertyForm from '../PartnerPropertyForm'
 import { EMPTY_VALUES, loadAmenities } from '../load'
@@ -24,7 +24,6 @@ export default async function NuevaCabanaPage() {
         userId={partner.user_id}
         amenities={amenities}
         initial={EMPTY_VALUES}
-        markupPct={PARTNER_MARKUP_PCT}
         feePct={PARTNER_FEE_PCT}
         submitLabel="Enviar a revisión"
       />
