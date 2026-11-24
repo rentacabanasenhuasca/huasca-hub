@@ -14,11 +14,13 @@ export default function CompactSearchForm({
   defaultCheckout,
   defaultGuests,
   defaultJacuzzi,
+  defaultTipo = '',
 }: {
   defaultCheckin?: string
   defaultCheckout?: string
   defaultGuests: GuestCounts
   defaultJacuzzi?: boolean
+  defaultTipo?: string
 }) {
   return (
     <form
@@ -46,6 +48,20 @@ export default function CompactSearchForm({
           className="accent-gold"
         />
         🛁 Con jacuzzi
+      </label>
+      {/* Tipo de propiedad: lo define el anfitrión en cada anuncio. */}
+      <label className="self-center">
+        <span className="sr-only">Tipo de propiedad</span>
+        <select
+          name="tipo"
+          defaultValue={defaultTipo}
+          className="rounded-full border border-stone/25 bg-white px-3 py-1.5 text-xs text-navy-deep focus:border-gold focus:outline-none"
+        >
+          <option value="">Todos los tipos</option>
+          <option value="accesible">Accesible</option>
+          <option value="media">Media</option>
+          <option value="premium">Premium</option>
+        </select>
       </label>
       <button
         type="submit"
