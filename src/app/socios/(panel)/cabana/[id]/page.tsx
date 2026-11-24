@@ -71,7 +71,6 @@ export default async function EditarCabanaPage({
         action={savePartnerProperty.bind(null, id)}
         userId={partner.user_id}
         amenities={amenities}
-        markupPct={Number(property.partner_markup_pct)}
         feePct={Number(property.partner_fee_pct)}
         submitLabel="Guardar cambios"
         initial={{
