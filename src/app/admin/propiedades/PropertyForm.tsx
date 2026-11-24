@@ -23,6 +23,7 @@ export type PropertyRecord = {
   base_occupancy: number
   extra_guest_fee_mxn: number
   google_maps_link: string | null
+  arrival_instructions?: string | null
   lat: number | null
   lng: number | null
   show_exact_location: boolean
@@ -479,6 +480,16 @@ export default function PropertyForm({
               defaultValue={property?.google_maps_link ?? ''}
               className={inputClass}
               placeholder="https://maps.google.com/…"
+            />
+          </label>
+          <label className="sm:col-span-2">
+            <span className={labelClass}>Cómo llegar (va en el correo de confirmación del huésped)</span>
+            <textarea
+              name="arrival_instructions"
+              defaultValue={property?.arrival_instructions ?? ''}
+              rows={5}
+              className={inputClass}
+              placeholder="Ruta paso a paso con referencias claras, cómo es el camino, cómo reconocer la entrada y dónde estacionarse."
             />
           </label>
           <NumberField label="Latitud" name="lat" defaultValue={property?.lat ?? ''} step={0.000001} />
