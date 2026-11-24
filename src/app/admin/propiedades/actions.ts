@@ -53,6 +53,10 @@ function buildPropertyPayload(formData: FormData) {
       | 'media'
       | 'lujo'
       | null,
+    admin_rating: (() => {
+      const r = Number(formData.get('admin_rating'))
+      return formData.get('admin_rating') && Number.isFinite(r) ? Math.min(5, Math.max(1, Math.round(r * 10) / 10)) : null
+    })(),
     base_occupancy: num(formData, 'base_occupancy') ?? num(formData, 'capacity') ?? 1,
     extra_guest_fee_mxn: num(formData, 'extra_guest_fee_mxn') ?? 0,
 
