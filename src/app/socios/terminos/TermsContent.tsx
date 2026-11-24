@@ -1,10 +1,9 @@
-import { PARTNER_FEE_PCT, PARTNER_MARKUP_PCT } from '@/lib/partners'
+import { PARTNER_FEE_PCT } from '@/lib/partners'
 
 // Términos para socios. Se muestran en /socios/terminos y se aceptan al
 // registrarse.
 export default function TermsContent() {
   const ex = 3000
-  const guest = Math.round((ex * (1 + PARTNER_MARKUP_PCT / 100)) / 10) * 10
   const net = Math.round(ex * (1 - PARTNER_FEE_PCT / 100))
   const h = 'font-semibold text-navy-deep mt-5 mb-1.5'
   return (
@@ -18,9 +17,10 @@ export default function TermsContent() {
 
       <h2 className={h}>2. Precio y comisiones</h2>
       <p>
-        Tú defines tu precio por noche. Al huésped se le cobra tu precio más un {PARTNER_MARKUP_PCT}% de cargo de plataforma, y a ti se te
-        descuenta un {PARTNER_FEE_PCT}% de comisión. Ejemplo: si tu precio es ${ex.toLocaleString('es-MX')}, el huésped paga $
-        {guest.toLocaleString('es-MX')} y tú recibes ${net.toLocaleString('es-MX')} por noche.
+        Tú defines tu precio por noche y a ti solo se te descuenta un {PARTNER_FEE_PCT}% de comisión: lo que recibes siempre sale de tu
+        precio. Ejemplo: si tu precio es ${ex.toLocaleString('es-MX')}, tú recibes ${net.toLocaleString('es-MX')} por noche. El precio
+        final al huésped lo define Huasca Retreats, que agrega su cargo de plataforma (publicidad, atención y cobro) y puede variar
+        según la temporada.
       </p>
 
       <h2 className={h}>3. Pagos</h2>
