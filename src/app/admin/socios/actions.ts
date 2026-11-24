@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { requireHost } from '@/lib/hosts'
 import { createServiceClient } from '@/lib/supabase/service'
-import { escapeHtml, mxn, sendPlainEmail, maskClabe } from '@/lib/partners'
+import { escapeHtml, guestPrice, mxn, sendPlainEmail, maskClabe } from '@/lib/partners'
+import { recomputeCalendarRange } from '@/lib/calendar'
+import { todayInMexicoStr } from '@/lib/dates'
 import { SITE_URL } from '@/lib/site'
 
 type Result = { error: string | null }
@@ -11,6 +13,51 @@ type Result = { error: string | null }
 async function partnerOf(service: ReturnType<typeof createServiceClient>, partnerId: string) {
   const { data } = await service.from('partners').select('id, name, email, bank_clabe, bank_name').eq('id', partnerId).maybeSingle()
   return data
+}
+
+// Precio al huésped, calificación y tipo de una cabaña de socio. Solo el
+// anfitrión lo ve: el socio sigue viendo únicamente su propio precio y lo que
+// recibe (su pago sale de su precio, no del que ve el huésped).
+export async function setPartnerPricing(
+  propertyId: string,
+  markupPct: number,
+  rating: number | null,
+  tier: string | null
+): Promise<Result> {
+  await requireHost()
+  const service = createServiceClient()
+  const { data: p } = await service
+    .from('properties')
+    .select('id, partner_id, partner_price_weekday, partner_price_weekend')
+    .eq('id', propertyId)
+    .maybeSingle()
+  if (!p?.partner_id) return { error: 'Esa cabaña no es de un socio.' }
+  const markup = Number(markupPct)
+  if (!Number.isFinite(markup) || markup < 0 || markup > 300) return { error: 'El margen debe estar entre 0% y 300%.' }
+  const r = rating == null ? null : Number(rating)
+  if (r != null && (!Number.isFinite(r) || r < 1 || r > 5)) return { error: 'La calificación va de 1 a 5.' }
+  const t = tier && ['accesible', 'media', 'lujo'].includes(tier) ? tier : null
+
+  const { error } = await service
+    .from('properties')
+    .update({
+      partner_markup_pct: Math.round(markup * 10) / 10,
+      weekday_price_mxn: guestPrice(Number(p.partner_price_weekday), markup),
+      weekend_price_mxn: guestPrice(Number(p.partner_price_weekend), markup),
+      admin_rating: r == null ? null : Math.round(r * 10) / 10,
+      price_tier: t,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', propertyId)
+  if (error) return { error: `No se pudo guardar: ${error.message}` }
+
+  const today = todayInMexicoStr()
+  const end = new Date(`${today}T00:00:00Z`)
+  end.setUTCDate(end.getUTCDate() + 400)
+  await recomputeCalendarRange(service, [propertyId], today, end.toISOString().slice(0, 10))
+  revalidatePath('/admin/socios')
+  revalidatePath('/')
+  return { error: null }
 }
 
 export async function approvePartnerProperty(propertyId: string): Promise<Result> {
