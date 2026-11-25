@@ -2,9 +2,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { notFound, redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getCabinData } from '@/lib/cabin-data'
 import { parseGuestsFromParams, fitsProperty, guestsSummary } from '@/lib/occupancy'
 import { getBookingQuote } from '@/lib/booking-quote'
-import { isUuid } from '@/lib/is-uuid'
 import GuestPicker from '@/components/GuestPicker'
 import DateRangePicker from '@/components/DateRangePicker'
 import PhotoGallery from '@/components/PhotoGallery'
@@ -61,30 +61,11 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const supabase = createServiceClient()
-
-  const { data: property } = await supabase
-    .from('properties')
-    .select('id, name, slug, description, capacity, bedrooms, bathrooms, weekday_price_mxn, pet_friendly')
-    .eq(isUuid(id) ? 'id' : 'slug', id)
-    .eq('status', 'published')
-    .maybeSingle()
-
-  if (!property) return {}
-
-  const { data: cover } = await supabase
-    .from('property_photos')
-    .select('url')
-    .eq('property_id', property.id)
-    .order('sort_order', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  const { data: amenityRows } = await supabase
-    .from('property_amenities')
-    .select('amenities(label)')
-    .eq('property_id', property.id)
-  const amenityLabels = ((amenityRows ?? []) as unknown as { amenities: { label: string } | { label: string }[] | null }[])
+  const cabin = await getCabinData(id)
+  if (!cabin) return {}
+  const property = cabin.property
+  const cover = cabin.photos[0] ?? null
+  const amenityLabels = ((cabin.propertyAmenities ?? []) as unknown as { amenities: { label: string } | { label: string }[] | null }[])
     .map((r) => (Array.isArray(r.amenities) ? r.amenities[0]?.label : r.amenities?.label))
     .filter((l): l is string => Boolean(l))
   const features = seoFeatures(property.name, property.description, amenityLabels)
@@ -134,14 +115,9 @@ export default async function CabanaPage({
   const { checkin, checkout } = sp
   const supabase = createServiceClient()
 
-  const { data: property } = await supabase
-    .from('properties')
-    .select(
-      'id, host_id, name, slug, description, capacity, bedrooms, beds, bathrooms, pet_friendly, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, max_nights, cancellation_policy, show_exact_location, google_maps_link, infants_count_toward_capacity, max_infants, max_children, booking_mode, for_sale, hide_calendar, admin_rating'
-    )
-    .eq(isUuid(id) ? 'id' : 'slug', id)
-    .eq('status', 'published')
-    .maybeSingle()
+  // Ficha, fotos, amenidades y camas: en caché 60 s (ver src/lib/cabin-data.ts).
+  const cabin = await getCabinData(id)
+  const property = cabin?.property ?? null
 
   if (!property) notFound()
 
@@ -150,23 +126,7 @@ export default async function CabanaPage({
   // que eso sea lo que quede indexado y se comparta de aquí en adelante.
   if (property.slug !== id) redirect(`/cabanas/${property.slug}`)
 
-  const [{ data: photos }, { data: propertyAmenities }, { data: propertyBeds }, { data: host }] = await Promise.all([
-    supabase
-      .from('property_photos')
-      .select('url, category, description, sort_order')
-      .eq('property_id', property.id)
-      .order('sort_order', { ascending: true }),
-    supabase
-      .from('property_amenities')
-      .select('description, amenities(label, category)')
-      .eq('property_id', property.id),
-    supabase
-      .from('property_beds')
-      .select('room_type, room_number, bed_type, quantity')
-      .eq('property_id', property.id)
-      .order('sort_order', { ascending: true }),
-    supabase.from('hosts').select('name, phone, email').eq('id', property.host_id).maybeSingle(),
-  ])
+  const { photos, propertyAmenities, propertyBeds, host } = cabin!
 
   // Camas agrupadas por espacio: "Recámara 1: 1 cama king, 1 cama individual".
   // Si solo hay una recámara se muestra como "Recámara" a secas.
@@ -200,6 +160,23 @@ export default async function CabanaPage({
   let minNightsOk = true
   let minGuestsCharged: number | null = null
 
+  // Noches ocupadas de los próximos 12 meses, para el calendario de la cabaña.
+  const availabilityStart = todayInMexicoStr()
+  const availabilityEnd = (() => {
+    const d = new Date(`${availabilityStart}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + 365)
+    return d.toISOString().slice(0, 10)
+  })()
+  // Se lanza ya (en paralelo con la cotización) y se espera más abajo.
+  const availabilityPromise = Promise.resolve(
+    supabase
+      .from('blocked_dates')
+      .select('date')
+      .eq('property_id', property.id)
+      .gte('date', availabilityStart)
+      .lte('date', availabilityEnd)
+  )
+
   if (hasSearch && !whatsappOnly) {
     const quote = await getBookingQuote(supabase, property, checkin!, checkout!, guests)
     nights = quote.nights
@@ -211,20 +188,7 @@ export default async function CabanaPage({
   }
 
   const fitsGuests = fitsProperty(property, guests)
-
-  // Noches ocupadas de los próximos 12 meses, para el calendario de la cabaña.
-  const availabilityStart = todayInMexicoStr()
-  const availabilityEnd = (() => {
-    const d = new Date(`${availabilityStart}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() + 365)
-    return d.toISOString().slice(0, 10)
-  })()
-  const { data: availabilityBlocked } = await supabase
-    .from('blocked_dates')
-    .select('date')
-    .eq('property_id', property.id)
-    .gte('date', availabilityStart)
-    .lte('date', availabilityEnd)
+  const { data: availabilityBlocked } = await availabilityPromise
 
   const amenityGroups = new Map<string, string[]>()
   for (const pa of (propertyAmenities ?? []) as unknown as {
