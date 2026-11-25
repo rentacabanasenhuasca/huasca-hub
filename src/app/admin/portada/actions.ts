@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireHost } from '@/lib/hosts'
+import { removeUnreferencedFiles } from '@/lib/storage-cleanup'
 
 export async function addHeroMedia(mediaType: 'image' | 'video', url: string) {
   const host = await requireHost()
@@ -91,6 +92,57 @@ export async function moveHeroMedia(id: string, direction: 'up' | 'down') {
   ])
   if (e1 || e2) return { error: `No se pudo reordenar: ${(e1 ?? e2)?.message}` }
 
+  revalidatePath('/admin/portada')
+  revalidatePath('/')
+  return { error: null }
+}
+
+// ----------------------------------------------------------------------------
+// Fotos de las secciones de la portada (historia, mosaico, cierre). Un lugar
+// sin foto elegida usa automáticamente una foto de las cabañas.
+// ----------------------------------------------------------------------------
+const HOMEPAGE_SLOTS = ['historia', 'mosaico_1', 'mosaico_2', 'mosaico_3', 'mosaico_4', 'cierre'] as const
+export type HomepageSlot = (typeof HOMEPAGE_SLOTS)[number]
+
+async function previousSlotUrl(hostId: string, slot: HomepageSlot) {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('homepage_photos')
+    .select('url')
+    .eq('host_id', hostId)
+    .eq('slot', slot)
+    .maybeSingle()
+  return data?.url ?? null
+}
+
+export async function setHomepagePhoto(slot: HomepageSlot, url: string) {
+  const host = await requireHost()
+  if (!HOMEPAGE_SLOTS.includes(slot)) return { error: 'Lugar no válido.' }
+  if (!url.trim()) return { error: 'Falta la foto.' }
+  const supabase = await createClient()
+  const old = await previousSlotUrl(host.id, slot)
+
+  const { error } = await supabase
+    .from('homepage_photos')
+    .upsert({ host_id: host.id, slot, url: url.trim(), updated_at: new Date().toISOString() })
+  if (error) return { error: `No se pudo guardar: ${error.message}` }
+
+  if (old && old !== url.trim()) await removeUnreferencedFiles([old])
+  revalidatePath('/admin/portada')
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function clearHomepagePhoto(slot: HomepageSlot) {
+  const host = await requireHost()
+  if (!HOMEPAGE_SLOTS.includes(slot)) return { error: 'Lugar no válido.' }
+  const supabase = await createClient()
+  const old = await previousSlotUrl(host.id, slot)
+
+  const { error } = await supabase.from('homepage_photos').delete().eq('host_id', host.id).eq('slot', slot)
+  if (error) return { error: `No se pudo quitar: ${error.message}` }
+
+  if (old) await removeUnreferencedFiles([old])
   revalidatePath('/admin/portada')
   revalidatePath('/')
   return { error: null }
