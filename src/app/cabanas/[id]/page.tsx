@@ -270,7 +270,7 @@ export default async function CabanaPage({
   }
 
   return (
-    <div className="font-body min-h-full bg-cream">
+    <div className="font-body min-h-full bg-[#f8f6f1] text-navy-deep">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -288,26 +288,22 @@ export default async function CabanaPage({
           }),
         }}
       />
-      <div className="sticky top-4 z-30 px-4">
-        <div className="max-w-5xl mx-auto flex flex-col gap-3 rounded-[28px] border border-stone/10 bg-white/90 backdrop-blur-md px-5 py-3 shadow-[0_1px_3px_rgba(16,27,40,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-2 sm:pr-2.5">
-          <div className="flex items-center justify-between sm:contents">
-            <Link href="/" className="sm:order-1 shrink-0 text-xs text-stone hover:text-navy-deep transition">
-              ← Volver a la búsqueda
-            </Link>
-            <Link href="/" aria-label="Huasca Retreats" className="sm:order-3 shrink-0">
-              <Image
-                src="/logo.png"
-                alt="Huasca Retreats"
-                width={800}
-                height={750}
-                className="h-20 w-auto sm:h-24 drop-shadow-md"
-              />
-            </Link>
-          </div>
+      <header className="sticky top-0 z-30 border-b border-stone/15 bg-[#f8f6f1]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-5 py-2 md:px-10">
+          <Link href="/" className="flex items-center gap-3" aria-label="Huasca Retreats">
+            <Image src="/logo.png" alt="Huasca Retreats" width={800} height={750} className="h-12 w-auto md:h-14" />
+            <span className="font-poster hidden text-lg sm:block">Huasca Retreats</span>
+          </Link>
+          <nav aria-label="Principal" className="flex items-center gap-5 text-[15px] font-medium">
+            <Link href="/#resultados" className="hidden hover:underline underline-offset-8 sm:inline">Todas las cabañas</Link>
+            <a href="#reservar" className="rounded-md border-[1.5px] border-navy-deep px-4 py-2 font-semibold transition hover:bg-navy-deep hover:text-cream">
+              Reservar
+            </a>
+          </nav>
         </div>
-      </div>
+      </header>
 
-      <main className="max-w-5xl mx-auto px-4 pt-8 pb-6 sm:pt-10 sm:pb-8">
+      <main className="mx-auto max-w-[1240px] px-5 pt-8 pb-16 md:px-10 md:pt-10 md:pb-24">
         <TrackViewContent id={property.id} name={property.name} price={property.weekday_price_mxn} />
         <PhotoGallery
           photos={photos ?? []}
@@ -315,22 +311,22 @@ export default async function CabanaPage({
           forSale={Boolean(property.for_sale)}
         />
 
-        <div className="grid lg:grid-cols-[1fr_340px] gap-8 lg:gap-10">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
           <div>
-            <h1 className="font-display text-3xl sm:text-4xl text-navy-deep">{property.name}</h1>
+            <h1 className="font-poster text-[clamp(40px,5vw,64px)] leading-[0.95]">{property.name}</h1>
             {property.admin_rating ? (
-              <p className="mt-1.5 text-sm font-medium text-navy-deep">
+              <p className="mt-3 text-[15px] font-semibold">
                 <span className="text-gold">★</span> {Number(property.admin_rating).toFixed(1)}{' '}
-                <span className="font-normal text-stone">· Calificación Huasca Retreats</span>
+                <span className="font-normal text-[#6f6d5c]">calificación Huasca Retreats</span>
               </p>
             ) : null}
-            <p className="text-sm text-stone mt-2.5">
-              Hasta {property.capacity} huéspedes · {property.bedrooms} recámaras · {property.beds} camas ·{' '}
-              {property.bathrooms} baños{property.pet_friendly ? ' · Pet friendly' : ''}
+            <p className="mt-4 text-lg text-[#6f6d5c]">
+              Hasta {property.capacity} huéspedes, {property.bedrooms} recámaras, {property.beds} camas y{' '}
+              {property.bathrooms} baños{property.pet_friendly ? '. Pet friendly' : ''}
             </p>
 
             {bedsByRoom.size > 0 && (
-              <div className="mt-2 text-sm text-stone space-y-0.5">
+              <div className="mt-3 space-y-0.5 text-[15px] text-[#6f6d5c]">
                 {[...bedsByRoom.entries()].map(([room, list]) => (
                   <p key={room}>
                     {room}: {list.join(', ')}
@@ -340,36 +336,35 @@ export default async function CabanaPage({
             )}
 
             {property.description && (
-              <p className="text-[15px] text-navy-deep mt-6 whitespace-pre-line leading-relaxed">
+              <p className="mt-8 max-w-[38em] whitespace-pre-line text-lg leading-[1.75] text-[#4f4d40]">
                 {property.description}
               </p>
             )}
 
             {amenityGroups.size > 0 && (
-              <div className="mt-8 pt-8 border-t border-stone/10">
-                <h2 className="font-display text-xl text-navy-deep mb-4">Amenidades</h2>
-                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+              <div className="mt-14">
+                <h2 className="font-poster mb-6 text-[clamp(30px,3.4vw,40px)] leading-none">Qué hay aquí</h2>
+                <ul className="grid gap-x-10 sm:grid-cols-2">
                   {[...amenityGroups.values()].flat().map((label, i) => (
-                    <p key={i} className="text-sm text-stone flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-gold shrink-0" />
+                    <li key={i} className="border-b border-[#ddd6c8] py-3 text-[15px]">
                       {label}
-                    </p>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
             {/* Todas las cabañas muestran su disponibilidad sincronizada,
                 incluidas las que se reservan por WhatsApp. */}
             {!hideCalendar && (
-            <div id="disponibilidad" className="mt-8 pt-8 border-t border-stone/10 scroll-mt-40">
-              <h2 className="font-display text-xl text-navy-deep mb-4">Disponibilidad</h2>
+            <div id="disponibilidad" className="mt-14 scroll-mt-24">
+              <h2 className="font-poster mb-6 text-[clamp(30px,3.4vw,40px)] leading-none">Fechas libres</h2>
               {whatsappOnly && (
-                <p className="text-sm text-stone -mt-2 mb-4">
+                <p className="-mt-2 mb-4 text-[15px] text-[#6f6d5c]">
                   Elige tus fechas libres en el calendario y te confirmamos por WhatsApp.
                 </p>
               )}
-              <div className="rounded-3xl border border-stone/10 bg-white p-4 sm:p-6 shadow-sm">
+              <div className="rounded-lg border border-[#e6e0d3] bg-white p-4 sm:p-6">
                 <Suspense fallback={null}>
                   <CabinAvailabilityCalendar
                     blockedDates={(availabilityBlocked ?? []).map((b) => b.date)}
@@ -383,7 +378,7 @@ export default async function CabanaPage({
             </div>
             )}
 
-            <div className="mt-8 pt-8 border-t border-stone/10 text-sm text-stone space-y-1.5">
+            <div className="mt-14 space-y-1.5 border-t border-[#ddd6c8] pt-8 text-[15px] text-[#6f6d5c]">
               <p>Estancia mínima: {property.min_nights} noche(s){property.max_nights ? ` · máxima ${property.max_nights}` : ''}</p>
               <p>
                 Política de cancelación:{' '}
@@ -396,7 +391,7 @@ export default async function CabanaPage({
               {property.max_children != null && <p>Máximo {property.max_children} niños (desde 3 años, cuentan como huésped).</p>}
               {property.google_maps_link && property.show_exact_location && (
                 <p>
-                  <a href={property.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-gold underline underline-offset-2">
+                  <a href={property.google_maps_link} target="_blank" rel="noopener noreferrer" className="font-semibold text-navy-deep underline underline-offset-4">
                     Ver ubicación en Google Maps
                   </a>
                 </p>
@@ -404,7 +399,7 @@ export default async function CabanaPage({
             </div>
           </div>
 
-          <div className="rounded-3xl border border-stone/10 bg-white p-5 sm:p-6 h-fit lg:sticky lg:top-20 shadow-sm">
+          <div id="reservar" className="h-fit scroll-mt-24 rounded-lg border border-[#e6e0d3] bg-white p-5 sm:p-7 lg:sticky lg:top-24">
             {whatsappOnly && (
               <div className="mb-4">
                 <p className="text-navy-deep">
@@ -434,8 +429,8 @@ export default async function CabanaPage({
                 type="submit"
                 className={
                   hasSearch
-                    ? 'w-full rounded-full border border-stone/25 px-4 py-2.5 text-sm font-medium text-navy-deep hover:bg-cream transition'
-                    : 'w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition'
+                    ? 'w-full rounded-md border-[1.5px] border-navy-deep px-4 py-3 text-sm font-semibold text-navy-deep hover:bg-navy-deep hover:text-cream transition'
+                    : 'w-full rounded-md bg-gold px-4 py-3 text-base font-semibold text-navy-deep hover:bg-gold-light transition'
                 }
               >
                 {hasSearch ? 'Actualizar fechas' : whatsappOnly ? 'Agregar fechas al mensaje' : 'Ver precio'}
@@ -474,7 +469,7 @@ export default async function CabanaPage({
                     )}
                     <TrackedBookLink
                       href={`/cabanas/${property.slug}/reservar?checkin=${checkin}&checkout=${checkout}&adults=${guests.adults}&children=${guests.children}&infants=${guests.infants}&pets=${guests.pets}`}
-                      className="mt-4 block text-center w-full rounded-full bg-gold px-4 py-2.5 text-sm font-semibold text-navy-deep hover:bg-gold-light transition"
+                      className="mt-4 block w-full rounded-md bg-gold px-4 py-3 text-center text-base font-semibold text-navy-deep transition hover:bg-gold-light"
                       propertyId={property.id}
                       value={total ?? 0}
                     >
@@ -492,8 +487,8 @@ export default async function CabanaPage({
                   target="_blank" rel="noopener noreferrer"
                   className={
                     whatsappOnly
-                      ? 'block text-center w-full rounded-full bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition'
-                      : 'block text-center w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition'
+                      ? 'block text-center w-full rounded-md bg-[#25D366] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition'
+                      : 'block text-center w-full rounded-md bg-navy-deep px-4 py-3 text-sm font-semibold text-cream hover:bg-navy transition'
                   }
                 >
                   {whatsappOnly ? 'Consultar disponibilidad por WhatsApp' : 'Preguntar / reservar por WhatsApp'}
@@ -501,7 +496,7 @@ export default async function CabanaPage({
               ) : host?.email ? (
                 <a
                   href={`mailto:${host.email}?subject=${encodeURIComponent('Reserva ' + property.name)}&body=${encodeURIComponent(waText)}`}
-                  className="block text-center w-full rounded-full bg-navy px-4 py-2.5 text-sm font-medium text-cream hover:bg-navy-deep transition"
+                  className="block w-full rounded-md bg-navy-deep px-4 py-3 text-center text-sm font-semibold text-cream transition hover:bg-navy"
                 >
                   Preguntar / reservar por correo
                 </a>
@@ -515,14 +510,14 @@ export default async function CabanaPage({
           </div>
         </div>
 
-        <section className="mt-12 pt-8 border-t border-stone/10">
-          <h2 className="font-display text-xl text-navy-deep mb-4">Más cabañas en Huasca de Ocampo</h2>
+        <section className="mt-20">
+          <h2 className="font-poster mb-6 text-[clamp(30px,3.4vw,40px)] leading-none">Más cabañas en Huasca</h2>
           <div className="flex flex-wrap gap-2">
             {LANDINGS.map((l) => (
               <Link
                 key={l.slug}
                 href={`/${l.slug}`}
-                className="rounded-full border border-stone/20 bg-white px-4 py-2 text-sm text-navy-deep hover:border-gold transition"
+                className="rounded-full border border-[#d6cdbb] px-4 py-2 text-sm font-medium transition hover:border-navy-deep"
               >
                 {l.label}
               </Link>
@@ -531,7 +526,7 @@ export default async function CabanaPage({
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter className="" />
     </div>
   )
 }
