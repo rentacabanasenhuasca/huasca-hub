@@ -24,6 +24,7 @@ export default function SiteFooter({ className = 'mt-16' }: { className?: string
               <li><Link href="/#resultados" className={link}>Todas las cabañas</Link></li>
               <li><Link href="/#calendario-disponibilidad" className={link}>Disponibilidad</Link></li>
               <li><Link href="/extras" className={link}>Extras</Link></li>
+              <li><Link href="/blog" className={link}>Blog y guías</Link></li>
               <li><Link href="/en-venta" className={link}>Casas en venta</Link></li>
             </ul>
           </div>
