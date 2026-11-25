@@ -11,6 +11,7 @@ import PublicAvailabilityGrid from '@/components/PublicAvailabilityGrid'
 import HeroCarousel from '@/components/HeroCarousel'
 import ForSaleBadge from '@/components/ForSaleBadge'
 import SiteFooter from '@/components/SiteFooter'
+import { ambientFromCabins, resolveHomepagePhotos } from '@/lib/homepage-photos'
 import type { Metadata } from 'next'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
 import { todayInMexicoStr } from '@/lib/dates'
@@ -347,24 +348,20 @@ export default async function Home({
     })),
   }
 
-  // Fotos para las secciones de ambiente (historia, mosaico, cierre): salen
-  // de las mismas fotos de las cabañas, así que siempre son reales y se
-  // actualizan solas cuando el anfitrión cambia fotos.
-  const photosByProperty = new Map<string, string[]>()
-  for (const photo of photos ?? []) {
-    if (!photosByProperty.has(photo.property_id)) photosByProperty.set(photo.property_id, [])
-    photosByProperty.get(photo.property_id)!.push(photo.url)
-  }
-  const ambient: string[] = []
-  for (const p of typedProperties) {
-    const list = photosByProperty.get(p.id) ?? []
-    if (list[0]) ambient.push(list[0])
-  }
-  const pick = (i: number) => (ambient.length ? ambient[i % ambient.length] : null)
-  const storyPhoto = pick(4)
-  const mosaic = [pick(9), pick(2), pick(7), pick(5)]
-  const closingPhoto =
-    heroMedia?.find((m) => m.media_type === 'image')?.url ?? pick(1)
+  // Fotos de las secciones (historia, mosaico, cierre): las que el anfitrión
+  // eligió en /admin/portada, y las demás salen solas de las fotos de las
+  // cabañas.
+  const { data: chosenPhotos } = hostId
+    ? await supabase.from('homepage_photos').select('slot, url').eq('host_id', hostId)
+    : { data: [] as { slot: string; url: string }[] }
+  const sectionPhotos = resolveHomepagePhotos(
+    ambientFromCabins(typedProperties.map((p) => p.id), photos ?? []),
+    heroMedia?.find((m) => m.media_type === 'image')?.url ?? null,
+    chosenPhotos ?? []
+  )
+  const storyPhoto = sectionPhotos.historia
+  const mosaic = [sectionPhotos.mosaico_1, sectionPhotos.mosaico_2, sectionPhotos.mosaico_3, sectionPhotos.mosaico_4]
+  const closingPhoto = sectionPhotos.cierre
   const qhSlug = LANDINGS.find((l) => l.slug.startsWith('que-hacer'))?.slug
 
   const searchProps = {
