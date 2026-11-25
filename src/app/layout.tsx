@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Bowlby_One_SC, Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { createServiceClient } from "@/lib/supabase/service";
+import { getSitePhone } from "@/lib/home-catalog";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import MetaPixel from "@/components/MetaPixel";
 import SiteAnalytics from "@/components/SiteAnalytics";
@@ -81,13 +81,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // toma el primero; si esto se vende a otros hospedajes con su propio
   // dominio, aquí es donde habría que resolver "cuál host" según el
   // dominio de la petición en vez de tomar siempre el primero.
-  const supabase = createServiceClient();
-  const { data: host } = await supabase
-    .from("hosts")
-    .select("phone")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const sitePhone = await getSitePhone();
 
   return (
     <html lang="es" className={`h-full antialiased ${fraunces.variable} ${plusJakarta.variable} ${bowlby.variable}`}>
@@ -98,7 +92,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <NavigationProgress />
         </Suspense>
         {children}
-        <WhatsAppFloatButton phone={host?.phone ?? null} />
+        <WhatsAppFloatButton phone={sitePhone} />
       </body>
     </html>
   );
