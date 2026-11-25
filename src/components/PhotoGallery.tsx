@@ -28,7 +28,7 @@ export default function PhotoGallery({ photos, alt, forSale = false }: { photos:
 
   if (photos.length === 0) {
     return (
-      <div className="h-56 sm:h-72 rounded-3xl bg-white border border-stone/10 flex items-center justify-center text-stone mb-8">
+      <div className="h-56 sm:h-72 rounded-lg bg-white border border-stone/10 flex items-center justify-center text-stone mb-8">
         Sin fotos todavía
       </div>
     )
@@ -36,7 +36,7 @@ export default function PhotoGallery({ photos, alt, forSale = false }: { photos:
 
   return (
     <>
-      <div className="relative rounded-3xl overflow-hidden mb-8">
+      <div className="relative rounded-lg overflow-hidden mb-10">
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2 h-64 sm:h-[420px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
