@@ -28,6 +28,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
+  const { data: posts } = await supabase
+    .from('blog_posts')
+    .select('slug, updated_at')
+    .eq('status', 'published')
+  const blogEntries: MetadataRoute.Sitemap = (posts ?? []).map((b) => ({
+    url: `${SITE_URL}/blog/${b.slug}`,
+    lastModified: new Date(b.updated_at),
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }))
+
   return [
     {
       url: SITE_URL,
@@ -50,6 +61,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.3,
     },
+    {
+      url: `${SITE_URL}/blog`,
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    },
+    ...blogEntries,
     // Páginas por intención de búsqueda (jacuzzi, glamping, grupos...).
     ...LANDINGS.map((l) => ({
       url: `${SITE_URL}/${l.slug}`,
