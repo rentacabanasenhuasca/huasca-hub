@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getHomeCatalog } from '@/lib/home-catalog'
 import { recomputeCalendarRange, nightsBetween, isWeekendNight } from '@/lib/calendar'
 import { parseGuestsFromParams, fitsProperty, occupantsFor, guestsSummary } from '@/lib/occupancy'
 import CompactSearchForm from '@/components/CompactSearchForm'
@@ -101,88 +102,24 @@ export default async function Home({
 
   const supabase = createServiceClient()
 
-  const { data: properties } = await supabase
-    .from('properties')
-    .select(
-      'id, host_id, name, slug, capacity, bedrooms, bathrooms, weekday_price_mxn, weekend_price_mxn, base_occupancy, extra_guest_fee_mxn, min_nights, pet_friendly, max_children, max_infants, infants_count_toward_capacity, booking_mode, for_sale, hide_calendar, admin_rating, price_tier'
-    )
-    .eq('status', 'published')
-    .order('name')
-
-  const typedProperties = (properties ?? []) as (PublicProperty & { host_id: string; booking_mode: string | null; for_sale: boolean | null; hide_calendar: boolean | null })[]
+  // Cabañas, fotos, portada, etc.: en caché 60 s (ver src/lib/home-catalog.ts).
+  const catalog = await getHomeCatalog()
+  const properties = catalog.properties
+  const typedProperties = (properties ?? []) as unknown as (PublicProperty & { host_id: string; booking_mode: string | null; for_sale: boolean | null; hide_calendar: boolean | null })[]
   const propertyIds = typedProperties.map((p) => p.id)
-  // El anfitrión "real": el dueño de las propiedades publicadas. Sirve para
-  // filtrar la portada (hero_media) — si por alguna razón llegara a existir
-  // más de una fila en `hosts` (por ejemplo de una sesión de prueba vieja),
-  // esto evita que se cuelen fotos/videos de un host distinto al del sitio.
-  const hostId = typedProperties[0]?.host_id ?? null
-
-  // WhatsApp del anfitrión, para el mensaje de "sin disponibilidad".
-  const { data: hostContact } = hostId
-    ? await supabase.from('hosts').select('phone').eq('id', hostId).maybeSingle()
-    : { data: null as { phone: string | null } | null }
-
-  // Casas en venta: si hay alguna publicada, se muestra un aviso con link a
-  // /en-venta (con la foto de portada de la primera).
-  const { data: saleListings } = await supabase
-    .from('sale_listings')
-    .select('id')
-    .eq('status', 'published')
-    .order('sort_order')
-    .order('created_at', { ascending: false })
-  const saleCount = saleListings?.length ?? 0
-  const { data: saleCover } =
-    saleCount > 0
-      ? await supabase
-          .from('sale_listing_media')
-          .select('url')
-          .eq('listing_id', saleListings![0].id)
-          .eq('kind', 'image')
-          .order('sort_order')
-          .limit(1)
-          .maybeSingle()
-      : { data: null as { url: string } | null }
-
-  const { data: photos } =
-    propertyIds.length > 0
-      ? await supabase
-          .from('property_photos')
-          .select('property_id, url, sort_order')
-          .in('property_id', propertyIds)
-          .order('sort_order', { ascending: true })
-      : { data: [] as { property_id: string; url: string; sort_order: number }[] }
+  const hostId = catalog.hostId
+  const hostContact = { phone: catalog.hostPhone }
+  const saleCount = catalog.saleCount
+  const saleCover = catalog.saleCoverUrl ? { url: catalog.saleCoverUrl } : null
+  const photos = catalog.photos
 
   const coverByProperty = new Map<string, string>()
   for (const photo of photos ?? []) {
     if (!coverByProperty.has(photo.property_id)) coverByProperty.set(photo.property_id, photo.url)
   }
 
-  // Qué propiedades tienen la amenidad "Jacuzzi" — para el filtro rápido del
-  // buscador (mismo patrón que Airbnb: un chip que reduce los resultados a
-  // las cabañas con esa amenidad). Solo se consulta si hace falta, para no
-  // pagar este join en cada carga de la portada.
-  const jacuzziPropertyIds = new Set<string>()
-  if (jacuzziOnly && propertyIds.length > 0) {
-    const { data: jacuzziRows } = await supabase
-      .from('property_amenities')
-      .select('property_id, amenities!inner(label)')
-      .in('property_id', propertyIds)
-      .ilike('amenities.label', 'jacuzzi')
-    for (const row of jacuzziRows ?? []) jacuzziPropertyIds.add(row.property_id)
-  }
-
-  // Portada: fotos y/o video que el host sube desde /admin/portada. Si no
-  // hay nada configurado, el hero se queda como el fondo sólido de siempre.
-  // Filtrado por host_id (ver arriba) para no mostrar filas huérfanas de
-  // otro host si llegara a haber alguno.
-  const { data: heroMedia } = hostId
-    ? await supabase
-        .from('hero_media')
-        .select('id, media_type, url')
-        .eq('enabled', true)
-        .eq('host_id', hostId)
-        .order('sort_order', { ascending: true })
-    : { data: [] as { id: string; media_type: 'image' | 'video'; url: string }[] }
+  const jacuzziPropertyIds = new Set<string>(jacuzziOnly ? catalog.jacuzziPropertyIds : [])
+  const heroMedia = catalog.heroMedia
 
   // Calendario de disponibilidad de todas las cabañas (verde/naranja), al
   // pie de la página — independiente de si ya se hizo una búsqueda.
@@ -351,9 +288,7 @@ export default async function Home({
   // Fotos de las secciones (historia, mosaico, cierre): las que el anfitrión
   // eligió en /admin/portada, y las demás salen solas de las fotos de las
   // cabañas.
-  const { data: chosenPhotos } = hostId
-    ? await supabase.from('homepage_photos').select('slot, url').eq('host_id', hostId)
-    : { data: [] as { slot: string; url: string }[] }
+  const chosenPhotos = catalog.chosenPhotos
   const sectionPhotos = resolveHomepagePhotos(
     ambientFromCabins(typedProperties.map((p) => p.id), photos ?? []),
     heroMedia?.find((m) => m.media_type === 'image')?.url ?? null,
