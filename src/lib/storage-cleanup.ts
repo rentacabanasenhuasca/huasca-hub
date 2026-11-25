@@ -23,14 +23,16 @@ export async function removeUnreferencedFiles(urls: string[]) {
   if (unique.length === 0) return
   const supabase = createServiceClient()
 
-  const [{ data: photos }, { data: hero }, { data: addons }] = await Promise.all([
+  const [{ data: photos }, { data: hero }, { data: addons }, { data: homepage }] = await Promise.all([
     supabase.from('property_photos').select('url').in('url', unique),
     supabase.from('hero_media').select('url').in('url', unique),
     supabase.from('addons').select('photo_url').in('photo_url', unique),
+    supabase.from('homepage_photos').select('url').in('url', unique),
   ])
   const stillUsed = new Set<string>([
     ...(photos ?? []).map((r) => r.url),
     ...(hero ?? []).map((r) => r.url),
+    ...(homepage ?? []).map((r) => r.url),
     ...(addons ?? []).map((r) => r.photo_url as string),
   ])
 
