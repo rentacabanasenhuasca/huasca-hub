@@ -7,6 +7,7 @@ import { renderMarkdown, readingMinutes } from '@/lib/markdown'
 import { optimizedImage } from '@/lib/media'
 import { SITE_URL, SITE_NAME } from '@/lib/site'
 import BlogHeader from '../BlogHeader'
+import ShareButtons from '@/components/ShareButtons'
 
 export const revalidate = 300
 
@@ -76,12 +77,19 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           // eslint-disable-next-line @next/next/no-img-element
           <img src={optimizedImage(post.cover_url, 1080)} alt={post.title} fetchPriority="high" className="mt-8 aspect-[16/10] w-full rounded-md object-cover" />
         )}
+        <div className="mt-6">
+          <ShareButtons url={`${SITE_URL}/blog/${post.slug}`} title={post.title} />
+        </div>
         <div
           className="blog-prose mt-10"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content_md) }}
         />
 
-        <aside className="mt-14 rounded-lg bg-navy-deep p-8 text-[#f8f6f1] md:p-10">
+        <div className="mt-12 border-t border-[#ddd6c8] pt-6">
+          <ShareButtons url={`${SITE_URL}/blog/${post.slug}`} title={post.title} />
+        </div>
+
+        <aside className="mt-10 rounded-lg bg-navy-deep p-8 text-[#f8f6f1] md:p-10">
           <h2 className="font-poster text-[clamp(28px,3vw,38px)] leading-none">Quédate en el bosque</h2>
           <p className="mt-4 max-w-[30em] text-[#f8f6f1]/80">
             Cabañas privadas en Huasca de Ocampo con fogata, asador y algunas con jacuzzi. Reserva directo y ve el
