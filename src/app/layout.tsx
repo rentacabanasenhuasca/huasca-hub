@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Bowlby_One_SC, Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { createServiceClient } from "@/lib/supabase/service";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
@@ -20,6 +20,15 @@ const fraunces = Fraunces({
   variable: "--font-display",
   weight: ["600", "700", "900"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+// Titulares del diseño nuevo de la portada (estilo póster, versalitas
+// gruesas). Solo se usa donde aparece la clase .font-poster.
+const bowlby = Bowlby_One_SC({
+  subsets: ["latin"],
+  variable: "--font-poster",
+  weight: "400",
   display: "swap",
 });
 
@@ -81,7 +90,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     .maybeSingle();
 
   return (
-    <html lang="es" className={`h-full antialiased ${fraunces.variable} ${plusJakarta.variable}`}>
+    <html lang="es" className={`h-full antialiased ${fraunces.variable} ${plusJakarta.variable} ${bowlby.variable}`}>
       <body className="min-h-full flex flex-col">
         <MetaPixel />
         <SiteAnalytics />
