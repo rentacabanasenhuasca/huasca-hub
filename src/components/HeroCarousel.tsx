@@ -43,7 +43,16 @@ export default function HeroCarousel({ items }: { items: HeroMediaItem[] }) {
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={optimizedImage(item.url, 1920)} alt="" className="h-full w-full object-cover" />
+            <img
+              src={optimizedImage(item.url, 1920)}
+              alt=""
+              // La primera foto es lo primero que ve el visitante: se pide
+              // con prioridad. Las demás esperan a que les toque.
+              fetchPriority={i === 0 ? 'high' : 'low'}
+              loading={i === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           )}
         </div>
       ))}
