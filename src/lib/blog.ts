@@ -12,11 +12,12 @@ export type BlogPost = {
   main_keyword: string | null
   keywords: string[]
   cover_url: string | null
+  social_caption: string | null
   published_at: string
   updated_at: string
 }
 
-const COLUMNS = 'id, slug, title, description, content_md, main_keyword, keywords, cover_url, published_at, updated_at'
+const COLUMNS = 'id, slug, title, description, content_md, main_keyword, keywords, cover_url, social_caption, published_at, updated_at'
 
 // Artículos publicados (los más nuevos primero). En caché 5 min para que el
 // blog cargue rápido; un artículo nuevo aparece a más tardar en 5 min.
@@ -31,7 +32,7 @@ export const getPublishedPosts = unstable_cache(
       .order('published_at', { ascending: false })
     return (data ?? []) as BlogPost[]
   },
-  ['blog-posts-v1'],
+  ['blog-posts-v2'],
   { revalidate: 300, tags: [BLOG_TAG] }
 )
 
