@@ -15,17 +15,19 @@ export default function CompactSearchForm({
   defaultGuests,
   defaultJacuzzi,
   defaultTipo = '',
+  action = '/#resultados',
 }: {
   defaultCheckin?: string
   defaultCheckout?: string
   defaultGuests: GuestCounts
   defaultJacuzzi?: boolean
   defaultTipo?: string
+  action?: string
 }) {
   return (
     <form
       method="get"
-      action="/#resultados"
+      action={action}
       className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-2 w-full sm:w-auto"
     >
       <div className="sm:w-64">
