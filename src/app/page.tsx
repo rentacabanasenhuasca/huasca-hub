@@ -335,6 +335,7 @@ export default async function Home({
               <a href="#calendario-disponibilidad" className="hover:underline underline-offset-8">Disponibilidad</a>
               <a href="#cerca" className="hover:underline underline-offset-8">Qué hay cerca</a>
               <Link href="/extras" className="hover:underline underline-offset-8">Extras</Link>
+              <Link href="/blog" className="hover:underline underline-offset-8">Blog</Link>
               <a href="#preguntas" className="hover:underline underline-offset-8">Preguntas</a>
               {saleCount > 0 && <Link href="/en-venta" className="hover:underline underline-offset-8">Casas en venta</Link>}
             </nav>
